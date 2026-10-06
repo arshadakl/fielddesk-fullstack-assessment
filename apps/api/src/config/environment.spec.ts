@@ -10,7 +10,55 @@ describe('API environment validation', () => {
     expect(validateEnvironment(validEnvironment)).toEqual({
       ...validEnvironment,
       PORT: 3001,
+      ALLOWED_ORIGINS: ['http://localhost:3000'],
+      SESSION_TTL_SECONDS: 28800,
+      COOKIE_SECURE: false,
+      REDIS_KEY_PREFIX: 'fielddesk',
     });
+  });
+
+  it.each([
+    '',
+    'null',
+    'https://example.com/path',
+    '*',
+    'https://user:password@example.com',
+  ])('rejects origin setting %s', (ALLOWED_ORIGINS) => {
+    expect(() =>
+      validateEnvironment({ ...validEnvironment, ALLOWED_ORIGINS }),
+    ).toThrow('ALLOWED_ORIGINS');
+  });
+  it.each(['0', '59', '604801', 'eight', '28800.5'])(
+    'rejects session lifetime %s',
+    (SESSION_TTL_SECONDS) => {
+      expect(() =>
+        validateEnvironment({ ...validEnvironment, SESSION_TTL_SECONDS }),
+      ).toThrow('SESSION_TTL_SECONDS');
+    },
+  );
+  it('requires secure cookies in production and validates explicit booleans', () => {
+    expect(
+      validateEnvironment({ ...validEnvironment, NODE_ENV: 'production' })
+        .COOKIE_SECURE,
+    ).toBe(true);
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        NODE_ENV: 'production',
+        COOKIE_SECURE: 'false',
+      }),
+    ).toThrow('COOKIE_SECURE');
+    expect(() =>
+      validateEnvironment({ ...validEnvironment, COOKIE_SECURE: 'yes' }),
+    ).toThrow('COOKIE_SECURE');
+  });
+  it('rejects unsafe Redis namespaces without printing the value', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        REDIS_KEY_PREFIX: 'secret/password',
+      }),
+    ).toThrow('REDIS_KEY_PREFIX');
   });
 
   it.each(['1', '65535', '3002', 3002])('accepts port %s', (PORT) => {

@@ -22,12 +22,30 @@
       "dependsOn": ["^build"],
       "cache": false,
       "persistent": true,
-      "passThroughEnv": ["PORT", "DATABASE_URL", "REDIS_URL", "NODE_ENV"]
+      "passThroughEnv": [
+        "PORT",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "NODE_ENV",
+        "ALLOWED_ORIGINS",
+        "SESSION_TTL_SECONDS",
+        "COOKIE_SECURE",
+        "REDIS_KEY_PREFIX"
+      ]
     },
     "@fielddesk/api#start": {
       "cache": false,
       "persistent": true,
-      "passThroughEnv": ["PORT", "DATABASE_URL", "REDIS_URL", "NODE_ENV"]
+      "passThroughEnv": [
+        "PORT",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "NODE_ENV",
+        "ALLOWED_ORIGINS",
+        "SESSION_TTL_SECONDS",
+        "COOKIE_SECURE",
+        "REDIS_KEY_PREFIX"
+      ]
     },
     "lint": { "dependsOn": ["^lint"] },
     "lint:fix": { "cache": false },

@@ -1,10 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { resolve } from 'node:path';
-import { validateEnvironment } from './config/environment';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { validateEnvironment } from './config/environment';
 import { DatabaseModule } from './database/database.module';
+import { AuthGuard } from './http/guards/auth.guard';
+import { AuthModule } from './modules/auth/auth.module';
+import { AuthRoutesModule } from './routes/auth/auth-routes.module';
+import { HealthRoutesModule } from './routes/health/health-routes.module';
+import { OrganisationRoutesModule } from './routes/organisation/organisation-routes.module';
 
 @Module({
   imports: [
@@ -17,8 +24,12 @@ import { DatabaseModule } from './database/database.module';
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    AuthModule,
+    AuthRoutesModule,
+    OrganisationRoutesModule,
+    HealthRoutesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}

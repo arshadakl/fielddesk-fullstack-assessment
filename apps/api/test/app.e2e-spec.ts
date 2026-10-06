@@ -1,9 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import type { App } from 'supertest/types';
+import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/database/prisma.service';
+import { RedisService } from '../src/infrastructure/redis/redis.service';
+import { configureApp } from '../src/http/configure-app';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -14,9 +17,13 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue({})
+      .overrideProvider(RedisService)
+      .useValue({})
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useLogger(false);
+    configureApp(app);
     await app.init();
   });
 
