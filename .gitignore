@@ -24,3 +24,7 @@ uploads/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Temporary
+*.md
+PLAN.md

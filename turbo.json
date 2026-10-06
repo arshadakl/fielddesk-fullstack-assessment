@@ -18,6 +18,16 @@
       "persistent": true,
       "passThroughEnv": ["PORT", "NEXT_PUBLIC_*"]
     },
+    "@fielddesk/api#dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["PORT", "DATABASE_URL", "REDIS_URL", "NODE_ENV"]
+    },
+    "@fielddesk/api#start": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["PORT", "DATABASE_URL", "REDIS_URL", "NODE_ENV"]
+    },
     "lint": { "dependsOn": ["^lint"] },
     "lint:fix": { "cache": false },
     "typecheck": { "dependsOn": ["^typecheck"] },
