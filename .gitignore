@@ -11,6 +11,9 @@ dist/
 build/
 coverage/
 .next/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
 
 # Runtime data
 uploads/

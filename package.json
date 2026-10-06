@@ -1,0 +1,27 @@
+{
+  "name": "@fielddesk/root",
+  "private": true,
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=22.23.1 <23",
+    "pnpm": "10.34.6"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@fielddesk/web",
+    "dev:api": "turbo run dev --filter=@fielddesk/api",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "typecheck": "turbo run typecheck",
+    "format:check": "prettier . --check",
+    "format": "prettier . --write",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4",
+    "turbo": "^2.0.0",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules/
+.next/
+dist/
+build/
+.turbo/
+coverage/
+pnpm-lock.yaml
+**/next-env.d.ts
+**/*.tsbuildinfo
+**/generated/
+# Preserve the assessment's supplied templates and documents.
+docs/ASSESSMENT.md
+docs/EVALUATION.md
+docs/SUBMISSION.md
+candidate-submission/TECHNICAL_NOTES.md
+.github/ISSUE_TEMPLATE/
+.github/pull_request_template.md
