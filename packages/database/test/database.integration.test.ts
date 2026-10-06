@@ -37,6 +37,10 @@ void test('fresh migrations and repeated seeds produce two organisations and six
 
 void test('seeds preserve edited names, roles, passwords and extra records', async () => {
   const email = 'owner.north@fielddesk.example';
+  const original = await client.user.findUniqueOrThrow({ where: { email } });
+  const originalOrganisation = await client.organisation.findUniqueOrThrow({
+    where: { id: original.organisationId },
+  });
   const editedHash = await hash('ChangedPassword!');
   const user = await client.user.update({
     where: { email },
@@ -77,6 +81,19 @@ void test('seeds preserve edited names, roles, passwords and extra records', asy
   );
   assert.equal(await client.organisation.count(), 3);
   assert.equal(await client.user.count(), 7);
+  // Leave the seeded login credentials and roles intact for subsequent API tests.
+  await client.user.update({
+    where: { id: original.id },
+    data: {
+      name: original.name,
+      role: original.role,
+      passwordHash: original.passwordHash,
+    },
+  });
+  await client.organisation.update({
+    where: { id: originalOrganisation.id },
+    data: { name: originalOrganisation.name },
+  });
 });
 
 void test('database enforces global email uniqueness, slug uniqueness and tenant references', async () => {
