@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { hash, verify } from 'argon2';
 import { createDatabaseClient, UserRole } from '../src';
-import { seedDatabase, SAMPLE_PASSWORD } from '../prisma/seed-data';
+import {
+  seedDatabase,
+  SAMPLE_PASSWORD,
+  seedOrganisations,
+} from '../prisma/seed-data';
 import { assertSafeTestDatabase } from '../scripts/test-safety';
 
 const url = assertSafeTestDatabase(
@@ -24,11 +28,38 @@ after(async () => {
   await client.$disconnect();
 });
 
-void test('fresh migrations and repeated seeds produce two organisations and six users', async () => {
+void test('fresh migrations and repeated seeds produce two organisations and ten users', async () => {
   await seedDatabase(client);
   await seedDatabase(client);
   assert.equal(await client.organisation.count(), 2);
-  assert.equal(await client.user.count(), 6);
+  assert.equal(await client.user.count(), 10);
+  for (const fixture of seedOrganisations) {
+    const organisation = await client.organisation.findUniqueOrThrow({
+      where: { slug: fixture.slug },
+    });
+    assert.equal(organisation.name, fixture.name);
+    const users = await client.user.findMany({
+      where: { organisationId: organisation.id },
+    });
+    assert.equal(
+      users.filter((user) => user.role === UserRole.OWNER).length,
+      1,
+    );
+    assert.equal(
+      users.filter((user) => user.role === UserRole.DISPATCHER).length,
+      1,
+    );
+    assert.equal(
+      users.filter((user) => user.role === UserRole.TECHNICIAN).length,
+      3,
+    );
+    for (const expected of fixture.users) {
+      const actual = users.find((user) => user.email === expected.email);
+      assert.ok(actual);
+      assert.equal(actual.name, expected.name);
+      assert.equal(actual.role, expected.role);
+    }
+  }
   for (const user of await client.user.findMany()) {
     assert.match(user.passwordHash, /^\$argon2id\$/);
     assert.ok(await verify(user.passwordHash, SAMPLE_PASSWORD));
@@ -36,7 +67,7 @@ void test('fresh migrations and repeated seeds produce two organisations and six
 });
 
 void test('seeds preserve edited names, roles, passwords and extra records', async () => {
-  const email = 'owner.north@fielddesk.example';
+  const email = 'arjun.nair@clearbrook.org';
   const original = await client.user.findUniqueOrThrow({ where: { email } });
   const originalOrganisation = await client.organisation.findUniqueOrThrow({
     where: { id: original.organisationId },
@@ -80,7 +111,7 @@ void test('seeds preserve edited names, roles, passwords and extra records', asy
     'Edited organisation',
   );
   assert.equal(await client.organisation.count(), 3);
-  assert.equal(await client.user.count(), 7);
+  assert.equal(await client.user.count(), 11);
   // Leave the seeded login credentials and roles intact for subsequent API tests.
   await client.user.update({
     where: { id: original.id },
