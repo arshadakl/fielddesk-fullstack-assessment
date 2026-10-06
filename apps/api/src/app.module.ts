@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { validateEnvironment } from './config/environment';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AppService } from './app.service';
       ignoreEnvFile: process.env.NODE_ENV === 'test',
       validate: validateEnvironment,
     }),
+    DatabaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

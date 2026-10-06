@@ -7,3 +7,7 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - '@parcel/watcher'
+  - '@prisma/engines'
+  - prisma
+  - argon2
+  - esbuild

@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.test.example
 
 # Dependencies
 node_modules/
@@ -14,6 +15,7 @@ coverage/
 .turbo/
 *.tsbuildinfo
 next-env.d.ts
+packages/database/src/generated/
 
 # Runtime data
 uploads/

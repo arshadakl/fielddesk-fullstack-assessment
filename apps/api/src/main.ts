@@ -5,6 +5,7 @@ import type { ApiEnvironment } from './config/environment';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
   const config = app.get(ConfigService<ApiEnvironment, true>);
   await app.listen(config.get('PORT', { infer: true }));
 }

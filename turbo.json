@@ -19,6 +19,7 @@
       "passThroughEnv": ["PORT", "NEXT_PUBLIC_*"]
     },
     "@fielddesk/api#dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true,
       "passThroughEnv": ["PORT", "DATABASE_URL", "REDIS_URL", "NODE_ENV"]
@@ -30,7 +31,14 @@
     },
     "lint": { "dependsOn": ["^lint"] },
     "lint:fix": { "cache": false },
-    "typecheck": { "dependsOn": ["^typecheck"] },
-    "test": { "outputs": [] }
+    "typecheck": { "dependsOn": ["^build"] },
+    "test": { "dependsOn": ["^build"], "outputs": [] },
+    "generate": { "cache": false },
+    "@fielddesk/database#lint": { "dependsOn": ["build"] },
+    "@fielddesk/database#typecheck": { "dependsOn": ["build"] },
+    "@fielddesk/database#build": {
+      "cache": false,
+      "outputs": ["dist/**", "src/generated/**"]
+    }
   }
 }
