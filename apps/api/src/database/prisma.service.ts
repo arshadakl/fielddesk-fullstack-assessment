@@ -1,6 +1,7 @@
+import { createDatabaseClient, PrismaClient } from '@fielddesk/database';
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createDatabaseClient, PrismaClient } from '@fielddesk/database';
+
 import type { ApiEnvironment } from '../config/environment';
 
 @Injectable()
