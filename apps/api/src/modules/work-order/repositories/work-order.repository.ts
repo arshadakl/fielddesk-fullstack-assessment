@@ -1,5 +1,5 @@
 import type { Prisma } from '@fielddesk/database';
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../database/prisma.service';
 import type {
@@ -273,6 +273,15 @@ export class WorkOrderRepository implements WorkOrderRepositoryPort {
       ) {
         throw new ConflictException(
           'Assigned technician does not belong to this organisation',
+        );
+      }
+      if (
+        errCode === '23514' ||
+        errCode === 'P2004' ||
+        errStr.includes('WorkOrder_valid_schedule_window_check')
+      ) {
+        throw new BadRequestException(
+          'Scheduled start time must precede scheduled end time',
         );
       }
     }

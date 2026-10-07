@@ -177,6 +177,51 @@ describe('WorkOrderService', () => {
         }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('rejects create when scheduled start is after or equal to end', async () => {
+      const start = new Date('2026-10-10T12:00:00Z');
+      const end = new Date('2026-10-10T11:00:00Z');
+
+      await expect(
+        service.create(tenant, 'creator-1', {
+          title: 'Test WO',
+          description: 'Test Desc',
+          siteName: 'Site A',
+          scheduledStart: start,
+          scheduledEnd: end,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects create when only scheduled start is provided', async () => {
+      const start = new Date('2026-10-10T12:00:00Z');
+
+      await expect(
+        service.create(tenant, 'creator-1', {
+          title: 'Test WO',
+          description: 'Test Desc',
+          siteName: 'Site A',
+          scheduledStart: start,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows create when valid scheduled window is provided without technician', async () => {
+      createWorkOrderMock.mockResolvedValue(mockWorkOrder);
+      const start = new Date('2026-10-10T10:00:00Z');
+      const end = new Date('2026-10-10T12:00:00Z');
+
+      const result = await service.create(tenant, 'creator-1', {
+        title: 'Test WO',
+        description: 'Test Desc',
+        siteName: 'Site A',
+        scheduledStart: start,
+        scheduledEnd: end,
+      });
+
+      expect(result).toBeDefined();
+      expect(createWorkOrderMock).toHaveBeenCalled();
+    });
   });
 
   describe('Status Transitions', () => {

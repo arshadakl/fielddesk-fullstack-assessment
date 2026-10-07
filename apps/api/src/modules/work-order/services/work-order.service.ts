@@ -86,16 +86,24 @@ export class WorkOrderService {
     creatorId: string,
     input: CreateWorkOrderInput,
   ): Promise<WorkOrderSummary> {
-    if (input.assignedTechnicianId) {
-      await this.validateTechnician(context, input.assignedTechnicianId);
+    if (input.scheduledStart || input.scheduledEnd) {
       if (!input.scheduledStart || !input.scheduledEnd) {
         throw new BadRequestException(
-          'Scheduled start and end time are required when assigning a technician',
+          'Both scheduled start and end time must be provided',
         );
       }
       if (input.scheduledStart >= input.scheduledEnd) {
         throw new BadRequestException(
           'Scheduled start time must precede scheduled end time',
+        );
+      }
+    }
+
+    if (input.assignedTechnicianId) {
+      await this.validateTechnician(context, input.assignedTechnicianId);
+      if (!input.scheduledStart || !input.scheduledEnd) {
+        throw new BadRequestException(
+          'Scheduled start and end time are required when assigning a technician',
         );
       }
     }

@@ -19,6 +19,7 @@ export function sendError(
     401: 'UNAUTHENTICATED',
     403: 'FORBIDDEN',
     404: 'NOT_FOUND',
+    409: 'CONFLICT',
     413: 'PAYLOAD_TOO_LARGE',
     415: 'UNSUPPORTED_MEDIA_TYPE',
     429: 'RATE_LIMITED',
@@ -41,6 +42,13 @@ export function sendError(
         details = body.message;
       }
     }
+  } else {
+    // Log unexpected non-HttpException 500 internal errors for debugging
+    process.stderr.write(
+      `[Unhandled Exception] [${request.requestId ?? 'unknown'}] ${
+        error instanceof Error ? error.stack || error.message : String(error)
+      }\n`,
+    );
   }
   response.status(status).json({
     code: codes[status] ?? 'INTERNAL_ERROR',
