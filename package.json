@@ -26,7 +26,9 @@
     "db:test:setup": "pnpm --filter @fielddesk/database test:setup",
     "db:test:reset": "pnpm --filter @fielddesk/database test:reset",
     "test:integration": "pnpm --filter @fielddesk/database build && pnpm --filter @fielddesk/database test:integration && pnpm --filter @fielddesk/api test:integration",
-    "prepare:api": "pnpm --filter @fielddesk/database build"
+    "prepare:api": "pnpm --filter @fielddesk/database build",
+    "codegen": "pnpm --filter @fielddesk/web codegen",
+    "test:e2e": "pnpm --filter @fielddesk/web test:e2e"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
