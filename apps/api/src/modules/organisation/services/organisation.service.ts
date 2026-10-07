@@ -3,7 +3,10 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { TenantContext } from '../../../common/interfaces/tenant-context.interface';
 import { ORGANISATION_REPOSITORY } from '../interfaces/organisation-repository.interface';
 import type { OrganisationRepositoryPort } from '../interfaces/organisation-repository.interface';
-import type { OrganisationSummary } from '../interfaces/organisation.interface';
+import type {
+  OrganisationSummary,
+  UpdateOrganisationInput,
+} from '../interfaces/organisation.interface';
 
 @Injectable()
 export class OrganisationService {
@@ -18,5 +21,18 @@ export class OrganisationService {
       throw new NotFoundException('Resource not found');
     }
     return organisation;
+  }
+
+  async updateCurrent(
+    context: TenantContext,
+    input: UpdateOrganisationInput,
+  ): Promise<OrganisationSummary> {
+    const updated = await this.repository.update(context, {
+      name: input.name.trim(),
+    });
+    if (!updated) {
+      throw new NotFoundException('Resource not found');
+    }
+    return updated;
   }
 }
