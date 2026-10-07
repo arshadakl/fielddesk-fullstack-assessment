@@ -9,9 +9,11 @@ import { validateEnvironment } from './config/environment';
 import { DatabaseModule } from './database/database.module';
 import { AuthGuard } from './http/guards/auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
+import { UserModule } from './modules/user/user.module';
 import { AuthRoutesModule } from './routes/auth/auth-routes.module';
 import { HealthRoutesModule } from './routes/health/health-routes.module';
 import { OrganisationRoutesModule } from './routes/organisation/organisation-routes.module';
+import { UsersRoutesModule } from './routes/users/users-routes.module';
 
 @Module({
   imports: [
@@ -25,7 +27,9 @@ import { OrganisationRoutesModule } from './routes/organisation/organisation-rou
     }),
     DatabaseModule,
     AuthModule,
+    UserModule,
     AuthRoutesModule,
+    UsersRoutesModule,
     OrganisationRoutesModule,
     HealthRoutesModule,
   ],
