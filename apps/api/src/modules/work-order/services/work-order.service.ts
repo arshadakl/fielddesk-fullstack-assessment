@@ -97,6 +97,10 @@ export class WorkOrderService {
           'Scheduled start time must precede scheduled end time',
         );
       }
+      const minAllowed = new Date(Date.now() - 5 * 60 * 1000);
+      if (input.scheduledStart < minAllowed) {
+        throw new BadRequestException('Scheduled start time cannot be in the past');
+      }
     }
 
     if (input.assignedTechnicianId) {
@@ -175,6 +179,11 @@ export class WorkOrderService {
       throw new BadRequestException(
         'Scheduled start time must precede scheduled end time',
       );
+    }
+
+    const minAllowed = new Date(Date.now() - 5 * 60 * 1000);
+    if (input.scheduledStart < minAllowed) {
+      throw new BadRequestException('Scheduled start time cannot be in the past');
     }
 
     await this.validateTechnician(context, input.assignedTechnicianId);

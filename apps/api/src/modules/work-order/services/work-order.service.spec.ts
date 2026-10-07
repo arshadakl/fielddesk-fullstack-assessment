@@ -222,6 +222,35 @@ describe('WorkOrderService', () => {
       expect(result).toBeDefined();
       expect(createWorkOrderMock).toHaveBeenCalled();
     });
+
+    it('rejects create when scheduled start is in the past', async () => {
+      const pastStart = new Date(Date.now() - 24 * 60 * 60 * 1000); // 1 day ago
+      const pastEnd = new Date(Date.now() - 23 * 60 * 60 * 1000);
+
+      await expect(
+        service.create(tenant, 'creator-1', {
+          title: 'Test WO',
+          description: 'Test Desc',
+          siteName: 'Site A',
+          scheduledStart: pastStart,
+          scheduledEnd: pastEnd,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects assign when scheduled start is in the past', async () => {
+      findWorkOrderByIdMock.mockResolvedValue(mockWorkOrder);
+      const pastStart = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+      const futureEnd = new Date(Date.now() + 60 * 60 * 1000);
+
+      await expect(
+        service.assign(tenant, 'wo-1', {
+          assignedTechnicianId: 'tech-1',
+          scheduledStart: pastStart,
+          scheduledEnd: futureEnd,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('Status Transitions', () => {

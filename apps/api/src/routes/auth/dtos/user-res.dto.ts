@@ -4,9 +4,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { OrganisationResDto } from '../../../common/dtos/organisation-res.dto';
 import type { Identity } from '../../../modules/auth/interfaces/auth-identity.interface';
 
-export class UserResDto {
-  static fromData(input: Identity): UserResDto {
-    const result = new UserResDto();
+export class AuthUserResDto {
+  static fromData(input: Identity): AuthUserResDto {
+    const result = new AuthUserResDto();
     result.id = input.id;
     result.email = input.email;
     result.name = input.name;
