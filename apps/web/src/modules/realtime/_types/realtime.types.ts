@@ -14,6 +14,8 @@ export interface RealtimeEventPayload<T = unknown> {
   type: RealtimeEventType;
   organisationId: string;
   workOrderId: string;
+  reference?: string;
+  assignedTechnicianId?: string | null;
   occurredAt: string;
   data: T;
 }

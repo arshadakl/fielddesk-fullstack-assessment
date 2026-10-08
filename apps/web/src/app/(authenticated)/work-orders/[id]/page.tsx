@@ -23,6 +23,7 @@ import { WorkOrderDetailSkeleton } from './_components/work-order-detail-skeleto
 import { WorkOrderHeader } from './_components/work-order-header';
 import { WorkOrderDetails } from './_components/work-order-details';
 import { WorkOrderScheduleCard } from './_components/work-order-schedule-card';
+import { ReassignedAlertModal } from './_components/reassigned-alert-modal';
 
 export default function WorkOrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -31,10 +32,60 @@ export default function WorkOrderDetailPage() {
 
   const [assignOpen, setAssignOpen] = React.useState(false);
   const [progressConfig, setProgressConfig] = React.useState<ProgressDialogConfig | null>(null);
+  const [reassignedState, setReassignedState] = React.useState<{
+    isOpen: boolean;
+    reference?: string;
+  }>({ isOpen: false });
 
   const { data: order, isLoading } = useWorkOrder(params.id);
   const { data: events, isLoading: eventsLoading } = useWorkOrderEvents(params.id);
   const updateStatusMutation = useUpdateWorkOrderStatus();
+
+  // Listen for real-time reassignment notification targeted to this technician
+  React.useEffect(() => {
+    // Owners and dispatchers retain full organizational access and must not be redirected
+    if (user?.role !== 'TECHNICIAN') {
+      return;
+    }
+
+    function handleUnassigned(event: Event) {
+      const customEvent = event as CustomEvent<{
+        workOrderId: string;
+        reference?: string;
+        assignedTechnicianId?: string | null;
+      }>;
+
+      // Only trigger if this work order matches AND was unassigned from this specific technician
+      const isTargetWorkOrder = customEvent.detail?.workOrderId === params.id;
+      const isUnassignedFromMe =
+        !customEvent.detail?.assignedTechnicianId ||
+        customEvent.detail.assignedTechnicianId === user?.id;
+
+      if (isTargetWorkOrder && isUnassignedFromMe) {
+        setReassignedState({
+          isOpen: true,
+          reference: customEvent.detail?.reference || order?.reference,
+        });
+      }
+    }
+
+    window.addEventListener('work-order-unassigned', handleUnassigned);
+    return () => {
+      window.removeEventListener('work-order-unassigned', handleUnassigned);
+    };
+  }, [params.id, order?.reference, user?.role, user?.id]);
+
+  if (reassignedState.isOpen) {
+    return (
+      <div className="space-y-6">
+        <WorkOrderDetailSkeleton />
+        <ReassignedAlertModal
+          open={true}
+          reference={reassignedState.reference}
+        />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return <WorkOrderDetailSkeleton />;

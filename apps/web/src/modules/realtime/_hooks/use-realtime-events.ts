@@ -83,6 +83,19 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
           });
         }
 
+        // Notify active work order views of unassignment
+        if (payload.type === 'WORK_ORDER_UNASSIGNED' && typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('work-order-unassigned', {
+              detail: {
+                workOrderId: payload.workOrderId,
+                reference: payload.reference,
+                assignedTechnicianId: payload.assignedTechnicianId,
+              },
+            }),
+          );
+        }
+
         // Show toast notification for new creations
         if (payload.type === 'WORK_ORDER_CREATED') {
           const data = payload.data as { reference?: string; title?: string };
