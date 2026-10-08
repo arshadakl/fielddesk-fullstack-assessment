@@ -11,7 +11,7 @@ import { AuthGuard } from '../../http/guards/auth.guard';
 import type { Identity } from '../../modules/auth/interfaces/auth-identity.interface';
 import { RealtimeService } from '../../modules/realtime/services/realtime.service';
 
-@Controller('realtime')
+@Controller('api/v1/realtime')
 @UseGuards(AuthGuard)
 export class RealtimeController {
   constructor(private readonly realtimeService: RealtimeService) {}
