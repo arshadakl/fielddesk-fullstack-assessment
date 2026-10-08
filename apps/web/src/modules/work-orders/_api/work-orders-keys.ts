@@ -17,4 +17,6 @@ export const workOrdersKeys = {
   details: () => [...workOrdersKeys.all, 'detail'] as const,
   detail: (orgId: string, id: string) =>
     [...workOrdersKeys.details(), orgId, id] as const,
+  events: (orgId: string, id: string) =>
+    [...workOrdersKeys.detail(orgId, id), 'events'] as const,
 };

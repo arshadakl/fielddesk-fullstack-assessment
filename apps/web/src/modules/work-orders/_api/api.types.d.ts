@@ -9,3 +9,7 @@ export type UpdateWorkOrderStatusDto = components['schemas']['UpdateWorkOrderSta
 
 export type WorkOrderPriority = components['schemas']['WorkOrderResDto']['priority'];
 export type WorkOrderStatus = components['schemas']['WorkOrderResDto']['status'];
+
+export type WorkOrderEventResDto = components['schemas']['WorkOrderEventResDto'];
+export type SubmitProgressEventDto = components['schemas']['SubmitProgressEventDto'];
+export type WorkOrderEventType = components['schemas']['WorkOrderEventResDto']['type'];

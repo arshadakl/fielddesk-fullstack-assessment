@@ -5,16 +5,18 @@ import { useSession } from '@/modules/auth/hooks/use-session';
 import type {
   AssignWorkOrderDto,
   CreateWorkOrderDto,
+  SubmitProgressEventDto,
   UpdateWorkOrderDto,
   UpdateWorkOrderStatusDto,
 } from '../_api/api.types';
 import {
   assignWorkOrder,
   createWorkOrder,
+  submitProgressEvent,
   updateWorkOrder,
   updateWorkOrderStatus,
 } from '../_api/work-orders-mutations';
-import { getWorkOrderById, getWorkOrders } from '../_api/work-orders-query';
+import { getWorkOrderById, getWorkOrderEvents, getWorkOrders } from '../_api/work-orders-query';
 import { workOrdersKeys, type WorkOrdersListParams } from '../_api/work-orders-keys';
 
 export function useWorkOrders(params: WorkOrdersListParams) {
@@ -90,6 +92,44 @@ export function useUpdateWorkOrderStatus() {
       void queryClient.invalidateQueries({ queryKey: workOrdersKeys.lists() });
       void queryClient.invalidateQueries({
         queryKey: workOrdersKeys.details(),
+      });
+    },
+  });
+}
+
+export function useWorkOrderEvents(workOrderId: string) {
+  const { session } = useSession();
+  const orgId = session.data?.organisation.id ?? '';
+
+  return useQuery({
+    queryKey: workOrdersKeys.events(orgId, workOrderId),
+    queryFn: ({ signal }) => getWorkOrderEvents(workOrderId, signal),
+    enabled: Boolean(orgId && workOrderId),
+  });
+}
+
+export function useSubmitProgressEvent() {
+  const { session } = useSession();
+  const orgId = session.data?.organisation.id ?? '';
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      workOrderId,
+      input,
+    }: {
+      workOrderId: string;
+      input: SubmitProgressEventDto;
+    }) => submitProgressEvent(workOrderId, input),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.events(orgId, variables.workOrderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.detail(orgId, variables.workOrderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.lists(),
       });
     },
   });

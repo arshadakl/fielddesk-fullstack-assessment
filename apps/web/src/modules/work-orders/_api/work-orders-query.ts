@@ -1,5 +1,5 @@
 import { apiClient } from '@/api/client';
-import type { WorkOrderListResDto, WorkOrderResDto } from './api.types';
+import type { WorkOrderEventResDto, WorkOrderListResDto, WorkOrderResDto } from './api.types';
 import type { WorkOrdersListParams } from './work-orders-keys';
 
 export async function getWorkOrders(
@@ -35,6 +35,20 @@ export async function getWorkOrderById(
   });
   if (error || !data) {
     throw error || new Error('Failed to load work order');
+  }
+  return data;
+}
+
+export async function getWorkOrderEvents(
+  id: string,
+  signal?: AbortSignal,
+): Promise<WorkOrderEventResDto[]> {
+  const { data, error } = await apiClient().GET('/api/v1/work-orders/{id}/events', {
+    params: { path: { id } },
+    signal,
+  });
+  if (error || !data) {
+    throw error || new Error('Failed to load work order activity history');
   }
   return data;
 }

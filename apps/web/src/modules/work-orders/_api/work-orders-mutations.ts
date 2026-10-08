@@ -3,8 +3,10 @@ import { assertAuthEpoch, authEpoch, getCsrf } from '@/modules/auth/api/auth-tra
 import type {
   AssignWorkOrderDto,
   CreateWorkOrderDto,
+  SubmitProgressEventDto,
   UpdateWorkOrderDto,
   UpdateWorkOrderStatusDto,
+  WorkOrderEventResDto,
   WorkOrderResDto,
 } from './api.types';
 
@@ -63,6 +65,24 @@ export async function updateWorkOrderStatus(id: string, input: UpdateWorkOrderSt
   assertAuthEpoch(expected);
   if (error || !data) {
     throw error || new Error('Failed to update work order status');
+  }
+  return data;
+}
+
+export async function submitProgressEvent(
+  id: string,
+  input: SubmitProgressEventDto,
+): Promise<WorkOrderEventResDto> {
+  const expected = authEpoch();
+  const csrf = await getCsrf();
+  const { data, error } = await apiClient().POST('/api/v1/work-orders/{id}/events', {
+    params: { path: { id } },
+    body: input,
+    headers: { 'X-CSRF-Token': csrf },
+  });
+  assertAuthEpoch(expected);
+  if (error || !data) {
+    throw error || new Error('Failed to submit progress event');
   }
   return data;
 }
