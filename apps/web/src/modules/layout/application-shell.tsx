@@ -7,10 +7,15 @@ import { useSession } from '@/modules/auth/hooks/use-session';
 import { ThemeSelector } from '@/modules/theme/theme-selector';
 import { Button } from '@/components/ui/button';
 import { useLogout } from '@/modules/auth/hooks/use-logout';
+import {
+  RealtimeStatusBadge,
+  useRealtimeEvents,
+} from '@/modules/realtime';
 
 export function ApplicationShell({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const logoutMutation = useLogout();
+  const { status: realtimeStatus } = useRealtimeEvents();
   const router = useRouter();
   const pathname = usePathname();
   const user = session.data;
@@ -79,6 +84,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <RealtimeStatusBadge status={realtimeStatus} />
             <ThemeSelector />
             <Button
               variant="outline"
