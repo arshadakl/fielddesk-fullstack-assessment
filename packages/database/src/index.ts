@@ -8,11 +8,13 @@ export {
   UserRole,
   WorkOrderPriority,
   WorkOrderStatus,
+  WorkOrderEventType,
 } from './generated/prisma/enums';
 export type {
   Organisation,
   User,
   Session,
   WorkOrder,
+  WorkOrderEvent,
 } from './generated/prisma/client';
 export { normalizeEmail } from './email';

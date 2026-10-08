@@ -38,6 +38,7 @@ model Organisation {
   updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
   users      User[]
   workOrders WorkOrder[]
+  events     WorkOrderEvent[]
 }
 
 model User {
@@ -54,6 +55,7 @@ model User {
   sessions            Session[]
   createdWorkOrders   WorkOrder[]  @relation("WorkOrderCreator")
   assignedWorkOrders  WorkOrder[]  @relation("WorkOrderAssignedTechnician")
+  workOrderEvents     WorkOrderEvent[]
 
   @@unique([organisationId, id])
   @@index([organisationId])
@@ -92,9 +94,36 @@ model WorkOrder {
   scheduledEnd         DateTime?         @db.Timestamptz(3)
   createdAt            DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  events               WorkOrderEvent[]
 
+  @@unique([organisationId, id])
   @@unique([organisationId, reference])
   @@index([organisationId, status])
   @@index([organisationId, assignedTechnicianId])
   @@index([organisationId, scheduledStart])
+}
+
+enum WorkOrderEventType {
+  STATUS_CHANGED
+  NOTE_ADDED
+  WORK_STARTED
+  WORK_COMPLETED
+}
+
+model WorkOrderEvent {
+  id             String             @id @default(uuid()) @db.Uuid
+  eventId        String
+  organisationId String             @db.Uuid
+  organisation   Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  workOrderId    String             @db.Uuid
+  workOrder      WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  userId         String             @db.Uuid
+  user           User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type           WorkOrderEventType
+  occurredAt     DateTime           @db.Timestamptz(3)
+  payload        Json               @db.JsonB
+  createdAt      DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@unique([organisationId, eventId])
+  @@index([organisationId, workOrderId, createdAt(sort: Desc)])
 }
