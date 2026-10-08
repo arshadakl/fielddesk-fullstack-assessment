@@ -17,6 +17,9 @@ describe('AttachmentService', () => {
   let listByWorkOrderMock: jest.Mock;
   let getOrganisationStorageUsageMock: jest.Mock;
   let deleteAttachmentMock: jest.Mock;
+  let findByWorkOrderAndHashMock: jest.Mock;
+  let findFirstByHashMock: jest.Mock;
+  let countByStorageKeyMock: jest.Mock;
 
   let findWorkOrderByIdMock: jest.Mock;
 
@@ -58,6 +61,9 @@ describe('AttachmentService', () => {
     listByWorkOrderMock = jest.fn();
     getOrganisationStorageUsageMock = jest.fn();
     deleteAttachmentMock = jest.fn();
+    findByWorkOrderAndHashMock = jest.fn().mockResolvedValue(null);
+    findFirstByHashMock = jest.fn().mockResolvedValue(null);
+    countByStorageKeyMock = jest.fn().mockResolvedValue(0);
 
     findWorkOrderByIdMock = jest.fn();
 
@@ -69,6 +75,9 @@ describe('AttachmentService', () => {
     mockAttachmentRepo = {
       create: createAttachmentMock,
       findById: findAttachmentByIdMock,
+      findByWorkOrderAndHash: findByWorkOrderAndHashMock,
+      findFirstByHash: findFirstByHashMock,
+      countByStorageKey: countByStorageKeyMock,
       listByWorkOrder: listByWorkOrderMock,
       getOrganisationStorageUsage: getOrganisationStorageUsageMock,
       delete: deleteAttachmentMock,
@@ -181,6 +190,7 @@ describe('AttachmentService', () => {
         originalFileName: 'report.pdf',
         mimeType: 'application/pdf',
         byteSize: validPdfBuffer.length,
+        contentHash: 'a'.repeat(64),
         createdAt: new Date(),
       };
 
@@ -198,15 +208,94 @@ describe('AttachmentService', () => {
 
       expect(result).toEqual(fakeAttachment);
       expect(saveFileMock).toHaveBeenCalled();
-      expect(createAttachmentMock).toHaveBeenCalledWith({
+      expect(createAttachmentMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organisationId: 'org-1',
+          workOrderId: 'wo-1',
+          uploaderId: 'tech-1',
+          storageKey: 'random-uuid.pdf',
+          originalFileName: 'report.pdf',
+          mimeType: 'application/pdf',
+          byteSize: validPdfBuffer.length,
+          contentHash: 'e16fa5d9b51928755db85b917f0297babaf22c7a47e97d9212adab56e61ba04e',
+        }),
+      );
+    });
+
+    it('throws 409 Conflict if same file is already uploaded to the same work order', async () => {
+      findWorkOrderByIdMock.mockResolvedValue(
+        createMockWorkOrder({ assignedTechnicianId: 'tech-1' }),
+      );
+
+      findByWorkOrderAndHashMock.mockResolvedValue({
+        id: 'existing-att',
+        originalFileName: 'already.pdf',
+      });
+
+      await expect(
+        service.upload(tenantContext, {
+          workOrderId: 'wo-1',
+          uploaderId: 'tech-1',
+          userRole: 'TECHNICIAN',
+          file: {
+            buffer: validPdfBuffer,
+            originalname: 'already.pdf',
+          } as Express.Multer.File,
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        message: 'This file has already been uploaded to this work order',
+      });
+
+      expect(saveFileMock).not.toHaveBeenCalled();
+      expect(createAttachmentMock).not.toHaveBeenCalled();
+    });
+
+    it('reuses existing storageKey and skips saving new physical file when same content exists in another work order', async () => {
+      findWorkOrderByIdMock.mockResolvedValue(
+        createMockWorkOrder({ assignedTechnicianId: 'tech-1' }),
+      );
+
+      findByWorkOrderAndHashMock.mockResolvedValue(null);
+      findFirstByHashMock.mockResolvedValue({
+        id: 'att-other-wo',
+        storageKey: 'shared-hash-key.pdf',
+      });
+
+      const fakeAttachment: AttachmentSummary = {
+        id: 'att-2',
         organisationId: 'org-1',
         workOrderId: 'wo-1',
         uploaderId: 'tech-1',
-        storageKey: 'random-uuid.pdf',
-        originalFileName: 'report.pdf',
+        uploaderName: 'Tech One',
+        originalFileName: 'report2.pdf',
         mimeType: 'application/pdf',
         byteSize: validPdfBuffer.length,
+        contentHash: 'b'.repeat(64),
+        createdAt: new Date(),
+      };
+
+      createAttachmentMock.mockResolvedValue(fakeAttachment);
+
+      const result = await service.upload(tenantContext, {
+        workOrderId: 'wo-1',
+        uploaderId: 'tech-1',
+        userRole: 'TECHNICIAN',
+        file: {
+          buffer: validPdfBuffer,
+          originalname: 'report2.pdf',
+        } as Express.Multer.File,
       });
+
+      expect(result).toEqual(fakeAttachment);
+      expect(saveFileMock).not.toHaveBeenCalled();
+      expect(getOrganisationStorageUsageMock).not.toHaveBeenCalled();
+      expect(createAttachmentMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          storageKey: 'shared-hash-key.pdf',
+          workOrderId: 'wo-1',
+        }),
+      );
     });
 
     it('cleans up saved file from disk if database insertion fails', async () => {
@@ -265,7 +354,7 @@ describe('AttachmentService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('allows OWNER to delete any attachment and cleans up storage', async () => {
+    it('allows OWNER to delete attachment and deletes physical file when reference count is 0', async () => {
       findWorkOrderByIdMock.mockResolvedValue(createMockWorkOrder());
 
       findAttachmentByIdMock.mockResolvedValue({
@@ -294,10 +383,38 @@ describe('AttachmentService', () => {
         storageKey: 'key-1.pdf',
       });
 
+      countByStorageKeyMock.mockResolvedValue(0);
+
       await service.delete(tenantContext, 'wo-1', 'att-1', 'OWNER', 'owner-1');
 
       expect(deleteAttachmentMock).toHaveBeenCalledWith('org-1', 'wo-1', 'att-1');
+      expect(countByStorageKeyMock).toHaveBeenCalledWith('key-1.pdf');
       expect(deleteFileMock).toHaveBeenCalledWith('key-1.pdf');
+    });
+
+    it('retains physical file when other records still reference the storageKey', async () => {
+      findWorkOrderByIdMock.mockResolvedValue(createMockWorkOrder());
+
+      findAttachmentByIdMock.mockResolvedValue({
+        id: 'att-1',
+        organisationId: 'org-1',
+        workOrderId: 'wo-1',
+        uploaderId: 'owner-1',
+        storageKey: 'shared-key.pdf',
+      });
+
+      deleteAttachmentMock.mockResolvedValue({
+        id: 'att-1',
+        storageKey: 'shared-key.pdf',
+      });
+
+      countByStorageKeyMock.mockResolvedValue(1);
+
+      await service.delete(tenantContext, 'wo-1', 'att-1', 'OWNER', 'owner-1');
+
+      expect(deleteAttachmentMock).toHaveBeenCalledWith('org-1', 'wo-1', 'att-1');
+      expect(countByStorageKeyMock).toHaveBeenCalledWith('shared-key.pdf');
+      expect(deleteFileMock).not.toHaveBeenCalled();
     });
   });
 });

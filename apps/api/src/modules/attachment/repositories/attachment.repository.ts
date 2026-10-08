@@ -23,6 +23,7 @@ const attachmentSummarySelect = {
   originalFileName: true,
   mimeType: true,
   byteSize: true,
+  contentHash: true,
   createdAt: true,
 } as const;
 
@@ -42,6 +43,7 @@ function mapAttachmentSummary(
     originalFileName: record.originalFileName,
     mimeType: record.mimeType,
     byteSize: record.byteSize,
+    contentHash: record.contentHash,
     createdAt: record.createdAt,
   };
 }
@@ -60,6 +62,7 @@ export class AttachmentRepository implements AttachmentRepositoryPort {
         originalFileName: input.originalFileName,
         mimeType: input.mimeType,
         byteSize: input.byteSize,
+        contentHash: input.contentHash,
       },
       select: attachmentSummarySelect,
     });
@@ -92,6 +95,60 @@ export class AttachmentRepository implements AttachmentRepositoryPort {
       ...mapAttachmentSummary(record),
       storageKey: record.storageKey,
     };
+  }
+
+  async findByWorkOrderAndHash(
+    organisationId: string,
+    workOrderId: string,
+    contentHash: string,
+  ): Promise<AttachmentSummary | null> {
+    const record = await this.prisma.client.attachment.findUnique({
+      where: {
+        organisationId_workOrderId_contentHash: {
+          organisationId,
+          workOrderId,
+          contentHash,
+        },
+      },
+      select: attachmentSummarySelect,
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return mapAttachmentSummary(record);
+  }
+
+  async findFirstByHash(
+    organisationId: string,
+    contentHash: string,
+  ): Promise<AttachmentStorageDetails | null> {
+    const record = await this.prisma.client.attachment.findFirst({
+      where: {
+        organisationId,
+        contentHash,
+      },
+      select: {
+        ...attachmentSummarySelect,
+        storageKey: true,
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return {
+      ...mapAttachmentSummary(record),
+      storageKey: record.storageKey,
+    };
+  }
+
+  async countByStorageKey(storageKey: string): Promise<number> {
+    return this.prisma.client.attachment.count({
+      where: { storageKey },
+    });
   }
 
   async listByWorkOrder(

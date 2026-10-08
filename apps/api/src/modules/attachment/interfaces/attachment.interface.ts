@@ -7,6 +7,7 @@ export interface AttachmentSummary {
   originalFileName: string;
   mimeType: string;
   byteSize: number;
+  contentHash: string;
   createdAt: Date;
 }
 
@@ -22,6 +23,7 @@ export interface CreateAttachmentRecordInput {
   originalFileName: string;
   mimeType: string;
   byteSize: number;
+  contentHash: string;
 }
 
 export interface StorageQuotaUsage {
@@ -36,6 +38,16 @@ export interface AttachmentRepositoryPort {
     workOrderId: string,
     attachmentId: string,
   ): Promise<AttachmentStorageDetails | null>;
+  findByWorkOrderAndHash(
+    organisationId: string,
+    workOrderId: string,
+    contentHash: string,
+  ): Promise<AttachmentSummary | null>;
+  findFirstByHash(
+    organisationId: string,
+    contentHash: string,
+  ): Promise<AttachmentStorageDetails | null>;
+  countByStorageKey(storageKey: string): Promise<number>;
   listByWorkOrder(
     organisationId: string,
     workOrderId: string,

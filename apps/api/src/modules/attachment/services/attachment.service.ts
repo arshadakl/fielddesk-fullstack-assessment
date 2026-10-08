@@ -83,34 +83,64 @@ export class AttachmentService {
       input.uploaderId,
     );
 
-    // 2. Validate file via magic byte sniffing & size limits
-    const { validatedMimeType, byteSize, originalFileName } =
+    // 2. Validate file via magic byte sniffing, size limits, and SHA-256 hash calculation
+    const { validatedMimeType, byteSize, originalFileName, contentHash } =
       validateUploadedFile(input.file);
 
-    // 3. Storage quota check
-    const quota = await this.repository.getOrganisationStorageUsage(
-      context.organisationId,
-    );
+    // 3. Duplicate check within the exact same work order
+    const existingInWorkOrder =
+      await this.repository.findByWorkOrderAndHash(
+        context.organisationId,
+        input.workOrderId,
+        contentHash,
+      );
 
-    if (!quota) {
-      throw new NotFoundException('Resource not found');
-    }
-
-    const projectedUsed = quota.usedBytes + BigInt(byteSize);
-    if (projectedUsed > quota.quotaBytes) {
+    if (existingInWorkOrder) {
       throw new HttpException(
-        'Organisation storage quota exceeded. Upgrade storage or delete old attachments.',
-        HttpStatus.PAYLOAD_TOO_LARGE,
+        'This file has already been uploaded to this work order',
+        HttpStatus.CONFLICT,
       );
     }
 
-    // 4. Save file to storage driver (opaque UUID storage key)
-    const { storageKey } = await this.storageDriver.save(
-      input.file.buffer,
-      originalFileName,
+    // 4. Content-addressable deduplication across the organisation
+    // If the exact same content exists elsewhere in the organization, reuse its storageKey
+    const existingInOrg = await this.repository.findFirstByHash(
+      context.organisationId,
+      contentHash,
     );
 
-    // 5. Persist attachment record in database; cleanup disk if DB fails
+    let storageKey: string;
+    let isNewPhysicalFile = false;
+
+    if (existingInOrg) {
+      storageKey = existingInOrg.storageKey;
+    } else {
+      // 5. Storage quota check only applies when storing new physical bytes
+      const quota = await this.repository.getOrganisationStorageUsage(
+        context.organisationId,
+      );
+
+      if (!quota) {
+        throw new NotFoundException('Resource not found');
+      }
+
+      const projectedUsed = quota.usedBytes + BigInt(byteSize);
+      if (projectedUsed > quota.quotaBytes) {
+        throw new HttpException(
+          'Organisation storage quota exceeded. Upgrade storage or delete old attachments.',
+          HttpStatus.PAYLOAD_TOO_LARGE,
+        );
+      }
+
+      const saved = await this.storageDriver.save(
+        input.file.buffer,
+        originalFileName,
+      );
+      storageKey = saved.storageKey;
+      isNewPhysicalFile = true;
+    }
+
+    // 6. Persist attachment record; cleanup physical file if new and DB fails
     try {
       const record = await this.repository.create({
         organisationId: context.organisationId,
@@ -120,11 +150,14 @@ export class AttachmentService {
         originalFileName,
         mimeType: validatedMimeType,
         byteSize,
+        contentHash,
       });
 
       return record;
     } catch (err: unknown) {
-      await this.storageDriver.delete(storageKey);
+      if (isNewPhysicalFile) {
+        await this.storageDriver.delete(storageKey);
+      }
       throw err;
     }
   }
@@ -217,7 +250,13 @@ export class AttachmentService {
     );
 
     if (deleted) {
-      await this.storageDriver.delete(deleted.storageKey);
+      // Only delete physical file from storage if no other records reference this storageKey
+      const remainingReferences = await this.repository.countByStorageKey(
+        deleted.storageKey,
+      );
+      if (remainingReferences === 0) {
+        await this.storageDriver.delete(deleted.storageKey);
+      }
     }
   }
 
