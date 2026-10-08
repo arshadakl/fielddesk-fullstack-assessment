@@ -42,6 +42,12 @@ export function sendError(
         details = body.message;
       }
     }
+  } else if (isMulterError(error)) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      message = 'File size exceeds maximum allowed limit of 10MB';
+    } else {
+      message = error.message || 'File upload error';
+    }
   } else {
     // Log unexpected non-HttpException 500 internal errors for debugging
     process.stderr.write(
@@ -58,12 +64,25 @@ export function sendError(
   });
 }
 
+function isMulterError(error: unknown): error is { name: string; code: string; message: string } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    error.name === 'MulterError' &&
+    'code' in error
+  );
+}
+
 function errorStatus(error: unknown): number {
   if (error instanceof HttpException) {
     return error.getStatus();
   }
   if (typeof error !== 'object' || error === null) {
     return 500;
+  }
+  if (isMulterError(error)) {
+    return error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
   }
   if ('status' in error && error.status === 413) {
     return 413;
@@ -76,7 +95,7 @@ function errorStatus(error: unknown): number {
 
 function defaultMessage(status: number): string {
   if (status === 413) {
-    return 'JSON body exceeds 16 KiB';
+    return 'Payload exceeds size limit';
   }
   if (status === 400) {
     return 'Invalid request';
