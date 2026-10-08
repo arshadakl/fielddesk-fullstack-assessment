@@ -144,8 +144,11 @@ model Attachment {
   originalFileName String
   mimeType         String
   byteSize         Int
+  contentHash      String       @db.Char(64)
   createdAt        DateTime     @default(now()) @db.Timestamptz(3)
 
+  @@unique([organisationId, workOrderId, contentHash])
   @@index([organisationId, workOrderId, createdAt(sort: Desc)])
+  @@index([organisationId, contentHash])
   @@index([organisationId, createdAt])
 }
