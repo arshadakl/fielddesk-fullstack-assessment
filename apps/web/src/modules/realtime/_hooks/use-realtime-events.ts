@@ -45,7 +45,7 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
       setStatus('reconnecting');
     };
 
-    es.onmessage = (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent) => {
       try {
         if (!event.data) return;
         const payload = JSON.parse(event.data) as RealtimeEventPayload;
@@ -55,53 +55,51 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
           return;
         }
 
-        // Handle domain events with targeted cache invalidation
-        switch (payload.type) {
-          case 'WORK_ORDER_CREATED': {
-            void queryClient.invalidateQueries({
-              queryKey: workOrdersKeys.lists(),
-            });
-            const data = payload.data as { reference?: string; title?: string };
-            toast.info(
-              `New work order ${data.reference ?? ''} created: ${data.title ?? ''}`,
-            );
-            break;
-          }
+        // Broad invalidation on work-orders root key ensures all list filters and details update
+        void queryClient.invalidateQueries({
+          queryKey: ['work-orders'],
+        });
 
-          case 'WORK_ORDER_UPDATED':
-          case 'WORK_ORDER_ASSIGNED':
-          case 'WORK_ORDER_STATUS_CHANGED': {
-            void queryClient.invalidateQueries({
-              queryKey: workOrdersKeys.lists(),
-            });
-            void queryClient.invalidateQueries({
-              queryKey: workOrdersKeys.detail(orgId, payload.workOrderId),
-            });
-            break;
-          }
+        // Targeted invalidations for specific views
+        if (payload.workOrderId) {
+          void queryClient.invalidateQueries({
+            queryKey: workOrdersKeys.detail(orgId, payload.workOrderId),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: workOrdersKeys.events(orgId, payload.workOrderId),
+          });
+        }
 
-          case 'PROGRESS_EVENT_ADDED': {
-            void queryClient.invalidateQueries({
-              queryKey: workOrdersKeys.events(orgId, payload.workOrderId),
-            });
-            void queryClient.invalidateQueries({
-              queryKey: workOrdersKeys.detail(orgId, payload.workOrderId),
-            });
-            void queryClient.invalidateQueries({
-              queryKey: workOrdersKeys.lists(),
-            });
-            break;
-          }
-
-          default:
-            break;
+        // Show toast notification for new creations
+        if (payload.type === 'WORK_ORDER_CREATED') {
+          const data = payload.data as { reference?: string; title?: string };
+          toast.info(
+            `New work order ${data.reference ?? ''} created: ${data.title ?? ''}`,
+          );
         }
       } catch {
         // Ignore unparseable frames safely
       }
     };
 
+    // W3C SSE standard: register listeners for named event types AND default message
+    const eventTypes = [
+      'WORK_ORDER_CREATED',
+      'WORK_ORDER_UPDATED',
+      'WORK_ORDER_ASSIGNED',
+      'WORK_ORDER_STATUS_CHANGED',
+      'PROGRESS_EVENT_ADDED',
+    ];
+
+    eventTypes.forEach((type) => {
+      es.addEventListener(type, handleMessage as EventListener);
+    });
+    es.onmessage = handleMessage;
+
     return () => {
+      eventTypes.forEach((type) => {
+        es.removeEventListener(type, handleMessage as EventListener);
+      });
       es.close();
       eventSourceRef.current = null;
       setStatus('disconnected');

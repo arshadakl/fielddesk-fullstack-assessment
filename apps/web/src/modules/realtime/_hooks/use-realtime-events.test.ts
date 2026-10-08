@@ -29,45 +29,25 @@ export function handleRealtimeEventMessage(
       return;
     }
 
-    switch (payload.type) {
-      case 'WORK_ORDER_CREATED': {
-        void queryClient.invalidateQueries({
-          queryKey: workOrdersKeys.lists(),
-        });
-        const data = payload.data as { reference?: string; title?: string };
-        toast.info(
-          `New work order ${data.reference ?? ''} created: ${data.title ?? ''}`,
-        );
-        break;
-      }
+    // Invalidate root work-orders query
+    void queryClient.invalidateQueries({
+      queryKey: ['work-orders'],
+    });
 
-      case 'WORK_ORDER_UPDATED':
-      case 'WORK_ORDER_ASSIGNED':
-      case 'WORK_ORDER_STATUS_CHANGED': {
-        void queryClient.invalidateQueries({
-          queryKey: workOrdersKeys.lists(),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: workOrdersKeys.detail(orgId, payload.workOrderId),
-        });
-        break;
-      }
+    if (payload.workOrderId) {
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.detail(orgId, payload.workOrderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.events(orgId, payload.workOrderId),
+      });
+    }
 
-      case 'PROGRESS_EVENT_ADDED': {
-        void queryClient.invalidateQueries({
-          queryKey: workOrdersKeys.events(orgId, payload.workOrderId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: workOrdersKeys.detail(orgId, payload.workOrderId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: workOrdersKeys.lists(),
-        });
-        break;
-      }
-
-      default:
-        break;
+    if (payload.type === 'WORK_ORDER_CREATED') {
+      const data = payload.data as { reference?: string; title?: string };
+      toast.info(
+        `New work order ${data.reference ?? ''} created: ${data.title ?? ''}`,
+      );
     }
   } catch {
     // Ignore malformed frames
@@ -107,7 +87,7 @@ describe('Realtime SSE Event Ingestion', () => {
     );
 
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['work-orders', 'list'],
+      queryKey: ['work-orders'],
     });
     expect(toast.info).toHaveBeenCalledWith(
       'New work order WO-0001 created: Fix HVAC unit',
@@ -131,7 +111,7 @@ describe('Realtime SSE Event Ingestion', () => {
     );
 
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['work-orders', 'list'],
+      queryKey: ['work-orders'],
     });
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['work-orders', 'detail', orgId, 'wo-1'],
@@ -155,13 +135,13 @@ describe('Realtime SSE Event Ingestion', () => {
     );
 
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['work-orders', 'detail', orgId, 'wo-1', 'events'],
+      queryKey: ['work-orders'],
     });
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['work-orders', 'detail', orgId, 'wo-1'],
     });
     expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['work-orders', 'list'],
+      queryKey: ['work-orders', 'detail', orgId, 'wo-1', 'events'],
     });
   });
 
