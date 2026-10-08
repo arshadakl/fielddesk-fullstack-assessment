@@ -31,12 +31,12 @@ import { UserResDto } from './dtos/user-res.dto';
 
 @ApiTags('Users')
 @ApiCookieAuth('session')
-@RequirePermission('users:manage')
 @Controller('api/v1/users')
 export class UsersController {
   constructor(private readonly users: UserService) {}
 
   @Get()
+  @RequirePermission(['users:manage', 'work:manage'])
   @ApiOperation({ summary: 'List organisation users' })
   @ApiResponse({ status: 200, type: UserListResDto })
   async list(
@@ -53,6 +53,7 @@ export class UsersController {
   }
 
   @Post()
+  @RequirePermission('users:manage')
   @ApiOperation({ summary: 'Create a new user in the organisation' })
   @ApiResponse({ status: 201, type: UserResDto })
   async create(
@@ -70,6 +71,7 @@ export class UsersController {
   }
 
   @Get(':id')
+  @RequirePermission('users:manage')
   @ApiOperation({ summary: 'Get user details by ID' })
   @ApiResponse({ status: 200, type: UserResDto })
   async getById(
@@ -82,6 +84,7 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @RequirePermission('users:manage')
   @ApiOperation({ summary: 'Update user profile' })
   @ApiResponse({ status: 200, type: UserResDto })
   async update(
@@ -95,6 +98,7 @@ export class UsersController {
   }
 
   @Put(':id/role')
+  @RequirePermission('users:manage')
   @ApiOperation({
     summary: 'Update user role and atomically revoke active sessions',
   })

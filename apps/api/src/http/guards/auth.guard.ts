@@ -24,17 +24,22 @@ export class AuthGuard implements CanActivate {
     if (!identity) {
       throw new UnauthorizedException('Authentication required');
     }
-    const permission = this.reflector.getAllAndOverride<Permission>(
-      'permission',
-      targets,
-    );
+    const permission = this.reflector.getAllAndOverride<
+      Permission | Permission[]
+    >('permission', targets);
     const permissions: Record<typeof identity.role, Permission[]> = {
       OWNER: ['work:manage', 'users:manage', 'settings:manage'],
       DISPATCHER: ['work:manage'],
       TECHNICIAN: ['work:assigned', 'progress:write'],
     };
-    if (permission && !permissions[identity.role].includes(permission)) {
-      throw new ForbiddenException('Permission denied');
+    if (permission) {
+      const userPermissions = permissions[identity.role];
+      const hasPermission = Array.isArray(permission)
+        ? permission.some((p) => userPermissions.includes(p))
+        : userPermissions.includes(permission);
+      if (!hasPermission) {
+        throw new ForbiddenException('Permission denied');
+      }
     }
     return true;
   }

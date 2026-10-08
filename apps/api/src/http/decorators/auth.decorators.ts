@@ -13,7 +13,7 @@ export type Permission =
   | 'users:manage'
   | 'settings:manage';
 export const RequirePermission = (
-  permission: Permission,
+  permission: Permission | Permission[],
 ): ReturnType<typeof SetMetadata> => SetMetadata('permission', permission);
 export const CurrentIdentity = createParamDecorator(
   (_data: unknown, context: ExecutionContext): Identity | undefined =>
