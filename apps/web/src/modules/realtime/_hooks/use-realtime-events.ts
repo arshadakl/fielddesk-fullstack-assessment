@@ -68,6 +68,19 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
           void queryClient.invalidateQueries({
             queryKey: workOrdersKeys.events(orgId, payload.workOrderId),
           });
+          void queryClient.invalidateQueries({
+            queryKey: workOrdersKeys.attachments(orgId, payload.workOrderId),
+          });
+        }
+
+        // Real-time storage quota bar invalidation
+        if (
+          payload.type === 'ATTACHMENT_ADDED' ||
+          payload.type === 'ATTACHMENT_DELETED'
+        ) {
+          void queryClient.invalidateQueries({
+            queryKey: workOrdersKeys.storageUsage(orgId),
+          });
         }
 
         // Show toast notification for new creations
@@ -75,6 +88,13 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
           const data = payload.data as { reference?: string; title?: string };
           toast.info(
             `New work order ${data.reference ?? ''} created: ${data.title ?? ''}`,
+          );
+        }
+
+        if (payload.type === 'ATTACHMENT_ADDED') {
+          const data = payload.data as { originalFileName?: string };
+          toast.info(
+            `New attachment uploaded: ${data.originalFileName ?? 'file'}`,
           );
         }
       } catch {
@@ -89,6 +109,8 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
       'WORK_ORDER_ASSIGNED',
       'WORK_ORDER_STATUS_CHANGED',
       'PROGRESS_EVENT_ADDED',
+      'ATTACHMENT_ADDED',
+      'ATTACHMENT_DELETED',
     ];
 
     eventTypes.forEach((type) => {
