@@ -1,0 +1,11 @@
+import type { components } from '@/api/schema';
+
+export type WorkOrderResDto = components['schemas']['WorkOrderResDto'];
+export type WorkOrderListResDto = components['schemas']['WorkOrderListResDto'];
+export type CreateWorkOrderDto = components['schemas']['CreateWorkOrderDto'];
+export type UpdateWorkOrderDto = components['schemas']['UpdateWorkOrderDto'];
+export type AssignWorkOrderDto = components['schemas']['AssignWorkOrderDto'];
+export type UpdateWorkOrderStatusDto = components['schemas']['UpdateWorkOrderStatusDto'];
+
+export type WorkOrderPriority = components['schemas']['WorkOrderResDto']['priority'];
+export type WorkOrderStatus = components['schemas']['WorkOrderResDto']['status'];
