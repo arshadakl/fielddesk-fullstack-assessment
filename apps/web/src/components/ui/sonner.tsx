@@ -6,10 +6,10 @@ export function Toaster() {
   return (
     <Sonner
       theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
-      position="top-center"
+      position="bottom-right"
       closeButton
-      offset="max(16px, env(safe-area-inset-top))"
-      mobileOffset="max(16px, env(safe-area-inset-top))"
+      offset="max(16px, env(safe-area-inset-bottom))"
+      mobileOffset="max(16px, env(safe-area-inset-bottom))"
       toastOptions={{
         classNames: {
           toast: 'auth-toast',
