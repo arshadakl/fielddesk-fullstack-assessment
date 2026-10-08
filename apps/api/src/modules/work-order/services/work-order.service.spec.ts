@@ -8,6 +8,7 @@ import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 
 import { PrismaService } from '../../../database/prisma.service';
+import { RealtimeService } from '../../realtime/services/realtime.service';
 import { UserService } from '../../user/services/user.service';
 import { WORK_ORDER_EVENT_REPOSITORY } from '../interfaces/work-order-event.interface';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
@@ -107,6 +108,11 @@ describe('WorkOrderService', () => {
       markPermanentFailure: jest.fn().mockResolvedValue(undefined),
     };
 
+    const mockRealtime = {
+      broadcastToOrganisation: jest.fn().mockResolvedValue(undefined),
+      createEventStream: jest.fn(),
+    };
+
     module = await Test.createTestingModule({
       providers: [
         WorkOrderService,
@@ -115,6 +121,7 @@ describe('WorkOrderService', () => {
         { provide: UserService, useValue: userService },
         { provide: 'NotificationRepositoryPort', useValue: mockNotificationRepo },
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: RealtimeService, useValue: mockRealtime },
       ],
     }).compile();
 
