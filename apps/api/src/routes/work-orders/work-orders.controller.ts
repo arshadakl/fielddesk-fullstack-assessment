@@ -26,6 +26,8 @@ import { CreateWorkOrderDto } from './dtos/create-work-order.dto';
 import { ListWorkOrdersQueryDto } from './dtos/list-work-orders-query.dto';
 import { UpdateWorkOrderStatusDto } from './dtos/update-work-order-status.dto';
 import { UpdateWorkOrderDto } from './dtos/update-work-order.dto';
+import { SubmitProgressEventDto } from './dtos/submit-progress-event.dto';
+import { WorkOrderEventResDto } from './dtos/work-order-event-res.dto';
 import { WorkOrderListResDto } from './dtos/work-order-list-res.dto';
 import { WorkOrderResDto } from './dtos/work-order-res.dto';
 
@@ -118,7 +120,8 @@ export class WorkOrdersController {
   @Post(':id/assign')
   @RequirePermission('work:manage')
   @ApiOperation({
-    summary: 'Assign technician and schedule window with concurrency overlap protection',
+    summary:
+      'Assign technician and schedule window with concurrency overlap protection',
   })
   @ApiResponse({ status: 200, type: WorkOrderResDto })
   async assign(
@@ -152,5 +155,57 @@ export class WorkOrdersController {
       identity.id,
     );
     return WorkOrderResDto.fromData(result);
+  }
+
+  @Post(':id/events')
+  @RequirePermission(['progress:write', 'work:manage'])
+  @ApiOperation({
+    summary: 'Submit an immutable progress event with idempotent deduplication',
+  })
+  @ApiResponse({ status: 201, type: WorkOrderEventResDto })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Conflict on invalid status transition or duplicate event ID mismatch',
+  })
+  async submitEvent(
+    @CurrentIdentity() identity: Identity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SubmitProgressEventDto,
+  ): Promise<WorkOrderEventResDto> {
+    const context = { organisationId: identity.organisation.id };
+    const result = await this.workOrders.submitProgressEvent(
+      context,
+      id,
+      {
+        eventId: dto.eventId,
+        type: dto.type,
+        occurredAt: dto.occurredAt,
+        payload: dto.payload,
+      },
+      identity.role,
+      identity.id,
+    );
+    return WorkOrderEventResDto.fromData(result);
+  }
+
+  @Get(':id/events')
+  @RequirePermission(['work:assigned', 'work:manage'])
+  @ApiOperation({
+    summary: 'Get chronological activity history of work order events',
+  })
+  @ApiResponse({ status: 200, type: [WorkOrderEventResDto] })
+  async listEvents(
+    @CurrentIdentity() identity: Identity,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<WorkOrderEventResDto[]> {
+    const context = { organisationId: identity.organisation.id };
+    const results = await this.workOrders.listEvents(
+      context,
+      id,
+      identity.role,
+      identity.id,
+    );
+    return results.map((event) => WorkOrderEventResDto.fromData(event));
   }
 }

@@ -12,6 +12,13 @@ import type { TenantContext } from '../../../common/interfaces/tenant-context.in
 import { UserService } from '../../user/services/user.service';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
 import type { WorkOrderRepositoryPort } from '../interfaces/work-order-repository.interface';
+import { WORK_ORDER_EVENT_REPOSITORY } from '../interfaces/work-order-event.interface';
+import type {
+  SubmitProgressEventInput,
+  WorkOrderEventRepositoryPort,
+  WorkOrderEventSummary,
+} from '../interfaces/work-order-event.interface';
+import type { WorkOrderEventRepository } from '../repositories/work-order-event.repository';
 import type {
   AssignWorkOrderInput,
   CreateWorkOrderInput,
@@ -36,6 +43,9 @@ export class WorkOrderService {
   constructor(
     @Inject(WORK_ORDER_REPOSITORY)
     private readonly repository: WorkOrderRepositoryPort,
+    @Inject(WORK_ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: WorkOrderEventRepositoryPort &
+      Pick<WorkOrderEventRepository, 'recordEventWithWorkOrderLock'>,
     private readonly users: UserService,
   ) {}
 
@@ -54,7 +64,10 @@ export class WorkOrderService {
     }
 
     // Technicians may only view work orders assigned to them
-    if (userRole === 'TECHNICIAN' && workOrder.assignedTechnicianId !== userId) {
+    if (
+      userRole === 'TECHNICIAN' &&
+      workOrder.assignedTechnicianId !== userId
+    ) {
       throw new NotFoundException('Resource not found');
     }
 
@@ -99,7 +112,9 @@ export class WorkOrderService {
       }
       const minAllowed = new Date(Date.now() - 5 * 60 * 1000);
       if (input.scheduledStart < minAllowed) {
-        throw new BadRequestException('Scheduled start time cannot be in the past');
+        throw new BadRequestException(
+          'Scheduled start time cannot be in the past',
+        );
       }
     }
 
@@ -183,7 +198,9 @@ export class WorkOrderService {
 
     const minAllowed = new Date(Date.now() - 5 * 60 * 1000);
     if (input.scheduledStart < minAllowed) {
-      throw new BadRequestException('Scheduled start time cannot be in the past');
+      throw new BadRequestException(
+        'Scheduled start time cannot be in the past',
+      );
     }
 
     await this.validateTechnician(context, input.assignedTechnicianId);
@@ -261,6 +278,132 @@ export class WorkOrderService {
       throw new BadRequestException(
         'Assigned user must have the technician role',
       );
+    }
+  }
+
+  async listEvents(
+    context: TenantContext,
+    workOrderId: string,
+    userRole: string,
+    userId: string,
+  ): Promise<WorkOrderEventSummary[]> {
+    // Check permission to view the work order first
+    await this.getById(context, workOrderId, userRole, userId);
+    return this.eventRepository.listByWorkOrderId(
+      context.organisationId,
+      workOrderId,
+    );
+  }
+
+  async submitProgressEvent(
+    context: TenantContext,
+    workOrderId: string,
+    input: SubmitProgressEventInput,
+    userRole: string,
+    userId: string,
+  ): Promise<WorkOrderEventSummary> {
+    // 1. Validate occurredAt timestamp sanity (cannot be > 5 minutes in future)
+    const maxFutureAllowed = new Date(Date.now() + 5 * 60 * 1000);
+    if (input.occurredAt.getTime() > maxFutureAllowed.getTime()) {
+      throw new BadRequestException('Event timestamp cannot be in the future');
+    }
+
+    // 2. Early idempotency check: if eventId was already processed for this tenant, return it
+    const existingEvent = await this.eventRepository.findByEventId(
+      context.organisationId,
+      input.eventId,
+    );
+    if (existingEvent) {
+      if (existingEvent.workOrderId !== workOrderId) {
+        throw new ConflictException(
+          'Event ID already processed for another work order',
+        );
+      }
+      return existingEvent;
+    }
+
+    // 3. Record event and execute status transition atomically under row lock
+    try {
+      return await this.eventRepository.recordEventWithWorkOrderLock(
+        context.organisationId,
+        workOrderId,
+        userId,
+        input,
+        (lockedWorkOrder) => {
+          // Verify occurredAt is not prior to work order creation (clock sanity)
+          if (
+            input.occurredAt.getTime() <
+            lockedWorkOrder.createdAt.getTime() - 60 * 1000
+          ) {
+            throw new BadRequestException(
+              'Event timestamp cannot precede work order creation',
+            );
+          }
+
+          // Technicians can only submit progress events for work orders assigned to them
+          if (
+            userRole === 'TECHNICIAN' &&
+            lockedWorkOrder.assignedTechnicianId !== userId
+          ) {
+            throw new NotFoundException('Resource not found');
+          }
+
+          // Determine if payload demands a status change
+          const requestedStatusRaw = input.payload.status;
+          if (
+            typeof requestedStatusRaw !== 'string' ||
+            requestedStatusRaw.trim().length === 0
+          ) {
+            return null;
+          }
+
+          const normalizedStatus =
+            requestedStatusRaw.toUpperCase() as WorkOrderStatus;
+          if (
+            ![
+              'DRAFT',
+              'SCHEDULED',
+              'IN_PROGRESS',
+              'COMPLETED',
+              'CANCELLED',
+            ].includes(normalizedStatus)
+          ) {
+            throw new BadRequestException(
+              `Unknown status: ${requestedStatusRaw}`,
+            );
+          }
+
+          if (normalizedStatus === lockedWorkOrder.status) {
+            return null;
+          }
+
+          // Enforce role-based restrictions on status update
+          if (userRole === 'TECHNICIAN') {
+            if (
+              normalizedStatus !== 'IN_PROGRESS' &&
+              normalizedStatus !== 'COMPLETED'
+            ) {
+              throw new ForbiddenException(
+                'Technicians may only update status to IN_PROGRESS or COMPLETED',
+              );
+            }
+          }
+
+          const allowed = PERMITTED_TRANSITIONS[lockedWorkOrder.status];
+          if (!allowed.includes(normalizedStatus)) {
+            throw new ConflictException(
+              `Invalid status transition from ${lockedWorkOrder.status} to ${normalizedStatus}`,
+            );
+          }
+
+          return normalizedStatus;
+        },
+      );
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'WORK_ORDER_NOT_FOUND') {
+        throw new NotFoundException('Resource not found');
+      }
+      throw err;
     }
   }
 }
