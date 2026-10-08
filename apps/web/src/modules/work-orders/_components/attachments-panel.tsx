@@ -3,13 +3,16 @@
 import * as React from 'react';
 import {
   AlertCircle,
+  Calendar,
   Download,
+  Eye,
   FileIcon,
   FileText,
   ImageIcon,
   Loader2,
   Trash2,
   UploadCloud,
+  User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getApiUrl } from '@/lib/env';
@@ -48,12 +51,24 @@ function formatBytes(bytes: number): string {
 
 function getFileIcon(mimeType: string) {
   if (mimeType.startsWith('image/')) {
-    return <ImageIcon className="size-4 text-sky-500 shrink-0" />;
+    return (
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+        <ImageIcon className="size-5" />
+      </div>
+    );
   }
   if (mimeType === 'application/pdf') {
-    return <FileText className="size-4 text-rose-500 shrink-0" />;
+    return (
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+        <FileText className="size-5" />
+      </div>
+    );
   }
-  return <FileIcon className="size-4 text-muted-foreground shrink-0" />;
+  return (
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+      <FileIcon className="size-5" />
+    </div>
+  );
 }
 
 export function AttachmentsPanel({
@@ -71,6 +86,7 @@ export function AttachmentsPanel({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = React.useState<AttachmentResDto | null>(null);
+  const [attachmentToPreview, setAttachmentToPreview] = React.useState<AttachmentResDto | null>(null);
 
   const canUpload = !isTechnician || isAssignedToMe;
 
@@ -95,18 +111,25 @@ export function AttachmentsPanel({
       return;
     }
 
-    try {
-      await uploadMutation.mutateAsync({
-        workOrderId,
-        file,
-      });
-      toast.success(`Uploaded ${file.name}`);
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+    const uploadPromise = uploadMutation.mutateAsync({
+      workOrderId,
+      file,
+    });
+
+    toast.promise(uploadPromise, {
+      loading: `Uploading ${file.name}...`,
+      success: `Uploaded ${file.name}`,
+      error: (err: unknown) => {
+        return err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
           ? err.message
           : 'Failed to upload attachment';
-      toast.error(msg);
+      },
+    });
+
+    try {
+      await uploadPromise;
+    } catch {
+      // Handled by toast.promise error callback
     }
   };
 
@@ -149,25 +172,39 @@ export function AttachmentsPanel({
 
   return (
     <section className="rounded-xl border border-border bg-card p-6 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold">Attachments & Photos</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Documents, equipment manuals, and completion photos (PDF, JPEG, PNG, WebP up to 10 MB).
-          </p>
-        </div>
+      <div>
+        <h2 className="text-base font-semibold">Attachments & Photos</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Documents, equipment manuals, and completion photos (PDF, JPEG, PNG, WebP up to 10 MB).
+        </p>
+      </div>
 
-        {storageUsage && (
-          <div className="text-right">
-            <span className="text-xs font-medium text-foreground">
+      {storageUsage && (
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-foreground">
               Storage: {storageUsage.percentageUsed}%
             </span>
-            <div className="text-[11px] text-muted-foreground">
+            <span className="text-muted-foreground">
               {formatBytes(storageUsage.usedBytes)} of {formatBytes(storageUsage.quotaBytes)}
-            </div>
+            </span>
           </div>
-        )}
-      </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                storageUsage.percentageUsed >= 95
+                  ? 'bg-destructive'
+                  : storageUsage.percentageUsed >= 85
+                    ? 'bg-amber-500'
+                    : 'bg-primary'
+              }`}
+              style={{
+                width: `${Math.min(100, Math.max(storageUsage.usedBytes > 0 ? 1 : 0, storageUsage.percentageUsed))}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {storageUsage && storageUsage.percentageUsed >= 85 && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
@@ -232,7 +269,7 @@ export function AttachmentsPanel({
             No attachments or photos uploaded yet.
           </div>
         ) : (
-          <div className="divide-y divide-border rounded-lg border border-border">
+          <div className="space-y-3">
             {attachments.map((att) => {
               const canDelete = isOwner || att.uploaderId === currentUserId;
               const downloadUrl = `${getApiUrl()}/api/v1/work-orders/${workOrderId}/attachments/${att.id}`;
@@ -240,43 +277,42 @@ export function AttachmentsPanel({
               return (
                 <div
                   key={att.id}
-                  className="flex items-center justify-between gap-3 p-3 text-sm hover:bg-muted/20 transition-colors"
+                  className="rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-sm"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {getFileIcon(att.mimeType)}
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground text-xs">
-                        {att.originalFileName}
-                      </p>
-                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                        <span>{formatBytes(att.byteSize)}</span>
-                        <span>•</span>
-                        <span>Uploaded by {att.uploaderName}</span>
-                        <span>•</span>
-                        <span>{new Date(att.createdAt).toLocaleDateString()}</span>
+                  {/* Top: Icon, File Details & Delete Button */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      {getFileIcon(att.mimeType)}
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className="font-semibold text-foreground text-sm leading-snug break-words"
+                          title={att.originalFileName}
+                        >
+                          {att.originalFileName}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <FileIcon className="size-3.5 shrink-0" />
+                            {formatBytes(att.byteSize)}
+                          </span>
+                          <span className="text-border">|</span>
+                          <span className="inline-flex items-center gap-1">
+                            <User className="size-3.5 shrink-0" />
+                            Uploaded by {att.uploaderName}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="size-3.5 shrink-0" />
+                          <span>{new Date(att.createdAt).toLocaleDateString()}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      asChild
-                      title="Download file"
-                    >
-                      <a href={downloadUrl} target="_blank" rel="noopener noreferrer" download>
-                        <Download className="size-4" />
-                        <span className="sr-only">Download</span>
-                      </a>
-                    </Button>
 
                     {canDelete && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="size-8 shrink-0 rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 hover:text-rose-700 dark:bg-rose-500/15 dark:text-rose-400 dark:hover:bg-rose-500/25"
                         onClick={() => setAttachmentToDelete(att)}
                         disabled={deleteMutation.isPending}
                         title="Delete attachment"
@@ -286,12 +322,124 @@ export function AttachmentsPanel({
                       </Button>
                     )}
                   </div>
+
+                  {/* Bottom: Separator & Action Buttons */}
+                  <div className="mt-4 pt-3 border-t border-border/70 grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-9 rounded-lg border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary font-medium text-xs flex items-center justify-center gap-2"
+                      onClick={() => setAttachmentToPreview(att)}
+                      title="Preview file"
+                    >
+                      <Eye className="size-4" />
+                      <span>Preview</span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-9 rounded-lg border-border hover:bg-muted/50 font-medium text-xs flex items-center justify-center gap-2"
+                      asChild
+                      title="Download file"
+                    >
+                      <a href={downloadUrl} target="_blank" rel="noopener noreferrer" download>
+                        <Download className="size-4" />
+                        <span>Download</span>
+                      </a>
+                    </Button>
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog
+        open={Boolean(attachmentToPreview)}
+        onOpenChange={(open) => {
+          if (!open) setAttachmentToPreview(null);
+        }}
+        contentClassName="max-w-3xl w-[95vw] max-h-[90vh] flex flex-col p-5"
+      >
+        <DialogHeader>
+          <DialogTitle className="truncate pr-6">
+            {attachmentToPreview?.originalFileName}
+          </DialogTitle>
+          <DialogDescription>
+            {attachmentToPreview ? formatBytes(attachmentToPreview.byteSize) : ''} •{' '}
+            {attachmentToPreview?.mimeType}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 min-h-[300px] max-h-[68vh] overflow-auto rounded-lg border border-border bg-muted/20 flex items-center justify-center p-2">
+          {attachmentToPreview && (
+            (() => {
+              const previewUrl = `${getApiUrl()}/api/v1/work-orders/${workOrderId}/attachments/${attachmentToPreview.id}`;
+              if (attachmentToPreview.mimeType.startsWith('image/')) {
+                return (
+                  /* eslint-disable-next-line @next/next/no-img-element -- Dynamic binary stream authenticated via backend session cookie */
+                  <img
+                    src={previewUrl}
+                    alt={attachmentToPreview.originalFileName}
+                    className="max-h-[64vh] max-w-full object-contain rounded"
+                  />
+                );
+              }
+              if (attachmentToPreview.mimeType === 'application/pdf') {
+                return (
+                  <iframe
+                    src={previewUrl}
+                    title={attachmentToPreview.originalFileName}
+                    className="w-full h-[64vh] rounded border-0"
+                  />
+                );
+              }
+              return (
+                <div className="text-center p-6 text-sm text-muted-foreground">
+                  Preview is not available for this file format.{' '}
+                  <a
+                    href={previewUrl}
+                    download
+                    className="text-primary underline font-medium"
+                  >
+                    Download to view
+                  </a>
+                </div>
+              );
+            })()
+          )}
+        </div>
+
+        <DialogFooter className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setAttachmentToPreview(null)}
+          >
+            Close
+          </Button>
+          {attachmentToPreview && (
+            <Button
+              type="button"
+              variant="default"
+              asChild
+            >
+              <a
+                href={`${getApiUrl()}/api/v1/work-orders/${workOrderId}/attachments/${attachmentToPreview.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+              >
+                <Download className="size-4 mr-1.5" />
+                Download
+              </a>
+            </Button>
+          )}
+        </DialogFooter>
+      </Dialog>
 
       {/* Confirmation Dialog for Deletion */}
       <Dialog

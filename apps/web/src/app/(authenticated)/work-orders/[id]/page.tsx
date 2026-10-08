@@ -43,13 +43,15 @@ export default function WorkOrderDetailPage() {
           <Skeleton className="h-9 w-24" />
           <Skeleton className="h-7 w-48" />
         </div>
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-7 space-y-6">
             <Skeleton className="h-44 w-full rounded-xl" />
             <Skeleton className="h-40 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-xl" />
           </div>
-          <div className="space-y-6">
+          <div className="lg:col-span-5 space-y-6">
             <Skeleton className="h-56 w-full rounded-xl" />
+            <Skeleton className="h-80 w-full rounded-xl" />
           </div>
         </div>
       </div>
@@ -187,8 +189,8 @@ export default function WorkOrderDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid gap-6 lg:grid-cols-12">
+        <div className="space-y-6 lg:col-span-7">
           <section className="rounded-xl border border-border bg-card p-6">
             <h2 className="text-base font-semibold">Description & Scope</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground/90">
@@ -215,15 +217,6 @@ export default function WorkOrderDetailPage() {
               </div>
             </dl>
           </section>
-
-          {/* Attachments & Photos Panel */}
-          <AttachmentsPanel
-            workOrderId={order.id}
-            isTechnician={isTechnician}
-            isAssignedToMe={isAssignedToMe}
-            currentUserId={user?.id}
-            isOwner={user?.role === 'OWNER'}
-          />
 
           {/* Activity History & Audit Trail */}
           <section className="rounded-xl border border-border bg-card p-6">
@@ -256,7 +249,7 @@ export default function WorkOrderDetailPage() {
           </section>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 lg:col-span-5">
           <section className="rounded-xl border border-border bg-card p-6">
             <h2 className="text-base font-semibold">Assignment & Schedule</h2>
             <div className="mt-4 space-y-4">
@@ -305,6 +298,15 @@ export default function WorkOrderDetailPage() {
               )}
             </div>
           </section>
+
+          {/* Attachments & Photos Panel */}
+          <AttachmentsPanel
+            workOrderId={order.id}
+            isTechnician={isTechnician}
+            isAssignedToMe={isAssignedToMe}
+            currentUserId={user?.id}
+            isOwner={user?.role === 'OWNER'}
+          />
         </div>
       </div>
 

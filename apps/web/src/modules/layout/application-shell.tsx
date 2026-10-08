@@ -64,8 +64,8 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
       >
         Skip to content
       </a>
-      <header className="border-b border-border bg-card px-5 py-4 sm:px-8">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
+      <header className="border-b border-border bg-card px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
             <NavLink
               href="/dashboard"
@@ -93,7 +93,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <div className="mx-auto grid max-w-6xl gap-6 px-5 py-7 md:grid-cols-[200px_1fr] sm:px-8">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8 md:grid-cols-[200px_1fr]">
         <aside>
           <nav aria-label="Main navigation" className="space-y-1">
             {navItems.map((item) => {
