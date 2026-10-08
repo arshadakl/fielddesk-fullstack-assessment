@@ -107,6 +107,7 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
       'WORK_ORDER_CREATED',
       'WORK_ORDER_UPDATED',
       'WORK_ORDER_ASSIGNED',
+      'WORK_ORDER_UNASSIGNED',
       'WORK_ORDER_STATUS_CHANGED',
       'PROGRESS_EVENT_ADDED',
       'ATTACHMENT_ADDED',
