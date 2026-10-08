@@ -24,6 +24,8 @@ export class RealtimeController {
   ): Observable<MessageEvent> {
     return this.realtimeService.createEventStream(
       identity.organisation.id,
+      identity.role,
+      identity.id,
     );
   }
 }

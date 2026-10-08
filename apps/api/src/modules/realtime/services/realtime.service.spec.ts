@@ -64,9 +64,9 @@ describe('RealtimeService', () => {
     );
   });
 
-  it('transforms subscribed Redis JSON events into SSE formatted events', () => {
+  it('transforms subscribed Redis JSON events into SSE formatted events for OWNER', () => {
     const orgId = 'org-clearbrook';
-    const stream$ = service.createEventStream(orgId);
+    const stream$ = service.createEventStream(orgId, 'OWNER', 'owner-1');
 
     const received: unknown[] = [];
     const sub = stream$.subscribe((event) => {
@@ -78,14 +78,14 @@ describe('RealtimeService', () => {
       type: 'WORK_ORDER_STATUS_CHANGED',
       organisationId: orgId,
       workOrderId: 'wo-123',
+      reference: 'WO-2026-0001',
+      assignedTechnicianId: 'tech-2',
       occurredAt: new Date().toISOString(),
       data: { status: 'IN_PROGRESS' },
     };
 
     messageSubject.next(JSON.stringify(payload));
 
-    // Verify first event is ping or message
-    expect(received.length).toBeGreaterThanOrEqual(1);
     const domainEvent = received.find(
       (e: unknown) =>
         typeof e === 'object' &&
@@ -100,9 +100,68 @@ describe('RealtimeService', () => {
     sub.unsubscribe();
   });
 
+  it('filters out events for TECHNICIAN when work order is assigned to someone else', () => {
+    const orgId = 'org-clearbrook';
+    const stream$ = service.createEventStream(orgId, 'TECHNICIAN', 'tech-1');
+
+    const received: unknown[] = [];
+    const sub = stream$.subscribe((event) => {
+      received.push(event);
+    });
+
+    // Event assigned to tech-2 (different technician)
+    const payload: RealtimeEventPayload = {
+      id: 'evt_test_secret',
+      type: 'PROGRESS_EVENT_ADDED',
+      organisationId: orgId,
+      workOrderId: 'wo-999',
+      reference: 'WO-2026-0999',
+      assignedTechnicianId: 'tech-2',
+      occurredAt: new Date().toISOString(),
+    };
+
+    messageSubject.next(JSON.stringify(payload));
+
+    const leakedEvent = received.find(
+      (e: unknown) =>
+        typeof e === 'object' &&
+        e !== null &&
+        'type' in e &&
+        (e as { type: string }).type === 'PROGRESS_EVENT_ADDED',
+    );
+
+    expect(leakedEvent).toBeUndefined();
+
+    // Event assigned to tech-1 (matching technician)
+    const assignedPayload: RealtimeEventPayload = {
+      id: 'evt_test_assigned',
+      type: 'PROGRESS_EVENT_ADDED',
+      organisationId: orgId,
+      workOrderId: 'wo-111',
+      reference: 'WO-2026-0111',
+      assignedTechnicianId: 'tech-1',
+      occurredAt: new Date().toISOString(),
+    };
+
+    messageSubject.next(JSON.stringify(assignedPayload));
+
+    const authorizedEvent = received.find(
+      (e: unknown) =>
+        typeof e === 'object' &&
+        e !== null &&
+        'type' in e &&
+        (e as { type: string }).type === 'PROGRESS_EVENT_ADDED',
+    );
+
+    expect(authorizedEvent).toBeDefined();
+    expect((authorizedEvent as { id: string }).id).toBe('evt_test_assigned');
+
+    sub.unsubscribe();
+  });
+
   it('emits an initial ping heartbeat on stream creation', (done) => {
     const orgId = 'org-clearbrook';
-    const stream$ = service.createEventStream(orgId);
+    const stream$ = service.createEventStream(orgId, 'OWNER', 'owner-1');
 
     stream$.pipe(take(1)).subscribe((firstEvent) => {
       expect(firstEvent.type).toBe('ping');

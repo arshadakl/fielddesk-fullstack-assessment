@@ -55,7 +55,7 @@ export class AttachmentService {
     workOrderId: string,
     userRole: string,
     userId: string,
-  ): Promise<void> {
+  ) {
     const workOrder = await this.workOrderRepository.findById(
       organisationId,
       workOrderId,
@@ -71,6 +71,8 @@ export class AttachmentService {
     ) {
       throw new NotFoundException('Resource not found');
     }
+
+    return workOrder;
   }
 
   async upload(
@@ -78,7 +80,7 @@ export class AttachmentService {
     input: UploadAttachmentInput,
   ): Promise<AttachmentSummary> {
     // 1. Verify work order exists and caller has access
-    await this.assertWorkOrderAccess(
+    const workOrder = await this.assertWorkOrderAccess(
       context.organisationId,
       input.workOrderId,
       input.userRole,
@@ -158,6 +160,8 @@ export class AttachmentService {
       void this.realtime.broadcastToOrganisation(context.organisationId, {
         type: 'ATTACHMENT_ADDED',
         workOrderId: input.workOrderId,
+        reference: workOrder.reference,
+        assignedTechnicianId: workOrder.assignedTechnicianId,
         data: record,
       });
 
@@ -227,7 +231,7 @@ export class AttachmentService {
     userRole: string,
     userId: string,
   ): Promise<void> {
-    await this.assertWorkOrderAccess(
+    const workOrder = await this.assertWorkOrderAccess(
       context.organisationId,
       workOrderId,
       userRole,
@@ -269,6 +273,8 @@ export class AttachmentService {
       void this.realtime.broadcastToOrganisation(context.organisationId, {
         type: 'ATTACHMENT_DELETED',
         workOrderId,
+        reference: workOrder.reference,
+        assignedTechnicianId: workOrder.assignedTechnicianId,
         data: { attachmentId },
       });
     }

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { merge, Observable, timer } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { filter, map } from 'rxjs/operators';
 
 import { RedisPubSubService } from '../../../infrastructure/redis/redis-pubsub.service';
 import type {
@@ -40,31 +40,56 @@ export class RealtimeService {
 
   /**
    * Creates an SSE-compliant stream for the given tenant organisation.
+   * Scopes events by role: OWNERS and DISPATCHERS see all events,
+   * while TECHNICIANS only receive events for work orders assigned to them.
    * Merges real-time domain events with a 15-second heartbeat ping.
    */
-  createEventStream(organisationId: string): Observable<RealtimeServerEvent> {
+  createEventStream(
+    organisationId: string,
+    userRole: string,
+    userId: string,
+  ): Observable<RealtimeServerEvent> {
     const channel = this.pubSub.getChannelName(organisationId);
 
-    // 1. Domain events stream from Redis Pub/Sub
+    // 1. Domain events stream from Redis Pub/Sub with role-based filtering
     const domainEvents$ = this.pubSub.subscribe(channel).pipe(
-      map((rawMessage: string): RealtimeServerEvent => {
+      map((rawMessage: string): RealtimeEventPayload | null => {
         try {
-          const parsed = JSON.parse(rawMessage) as RealtimeEventPayload;
-          return {
-            id: parsed.id,
-            type: parsed.type,
-            data: JSON.stringify(parsed),
-            retry: 5000, // Hint to browser EventSource to retry after 5s if disconnected
-          };
+          return JSON.parse(rawMessage) as RealtimeEventPayload;
         } catch {
-          return {
-            id: `evt_${randomUUID()}`,
-            type: 'MESSAGE',
-            data: rawMessage,
-            retry: 5000,
-          };
+          return null;
         }
       }),
+      filter((payload: RealtimeEventPayload | null): payload is RealtimeEventPayload => {
+        if (!payload) {
+          return false;
+        }
+
+        // Owners and Dispatchers have full organizational visibility
+        if (userRole === 'OWNER' || userRole === 'DISPATCHER') {
+          return true;
+        }
+
+        // Technicians can ONLY receive events for work orders explicitly assigned to them
+        if (userRole === 'TECHNICIAN') {
+          return payload.assignedTechnicianId === userId;
+        }
+
+        return false;
+      }),
+      map((payload: RealtimeEventPayload): RealtimeServerEvent => ({
+        id: payload.id,
+        type: payload.type,
+        data: JSON.stringify({
+          id: payload.id,
+          type: payload.type,
+          workOrderId: payload.workOrderId,
+          reference: payload.reference,
+          assignedTechnicianId: payload.assignedTechnicianId,
+          occurredAt: payload.occurredAt,
+        }),
+        retry: 5000,
+      })),
     );
 
     // 2. Keep-alive heartbeat stream every 15 seconds to prevent proxy / NAT timeouts

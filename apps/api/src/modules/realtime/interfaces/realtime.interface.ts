@@ -12,8 +12,10 @@ export interface RealtimeEventPayload<T = unknown> {
   type: RealtimeEventType;
   organisationId: string;
   workOrderId: string;
+  assignedTechnicianId?: string | null;
+  reference?: string;
   occurredAt: string;
-  data: T;
+  data?: T;
 }
 
 export interface RealtimeServerEvent {

@@ -50,6 +50,7 @@ function mapWorkOrderEvent(
 
 export interface LockedWorkOrderState {
   id: string;
+  reference: string;
   status: WorkOrderStatus;
   assignedTechnicianId: string | null;
   createdAt: Date;
@@ -114,12 +115,13 @@ export class WorkOrderEventRepository implements WorkOrderEventRepositoryPort {
         const lockedRows = await tx.$queryRaw<
           Array<{
             id: string;
+            reference: string;
             status: WorkOrderStatus;
             assignedTechnicianId: string | null;
             createdAt: Date;
           }>
         >`
-          SELECT "id", "status", "assignedTechnicianId", "createdAt"
+          SELECT "id", "reference", "status", "assignedTechnicianId", "createdAt"
           FROM "WorkOrder"
           WHERE "id" = ${workOrderId}::uuid AND "organisationId" = ${organisationId}::uuid
           FOR UPDATE

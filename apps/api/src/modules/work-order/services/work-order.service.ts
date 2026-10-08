@@ -145,6 +145,8 @@ export class WorkOrderService {
     void this.realtime.broadcastToOrganisation(context.organisationId, {
       type: 'WORK_ORDER_CREATED',
       workOrderId: created.id,
+      reference: created.reference,
+      assignedTechnicianId: created.assignedTechnicianId,
       data: created,
     });
 
@@ -187,6 +189,8 @@ export class WorkOrderService {
     void this.realtime.broadcastToOrganisation(context.organisationId, {
       type: 'WORK_ORDER_UPDATED',
       workOrderId: updated.id,
+      reference: updated.reference,
+      assignedTechnicianId: updated.assignedTechnicianId,
       data: updated,
     });
 
@@ -272,6 +276,8 @@ export class WorkOrderService {
     void this.realtime.broadcastToOrganisation(context.organisationId, {
       type: 'WORK_ORDER_ASSIGNED',
       workOrderId: updated.id,
+      reference: updated.reference,
+      assignedTechnicianId: updated.assignedTechnicianId,
       data: updated,
     });
 
@@ -325,6 +331,8 @@ export class WorkOrderService {
     void this.realtime.broadcastToOrganisation(context.organisationId, {
       type: 'WORK_ORDER_STATUS_CHANGED',
       workOrderId: updated.id,
+      reference: updated.reference,
+      assignedTechnicianId: updated.assignedTechnicianId,
       data: updated,
     });
 
@@ -393,6 +401,13 @@ export class WorkOrderService {
     }
 
     // 3. Record event and execute status transition atomically under row lock
+    const workOrderScope: {
+      reference: string | undefined;
+      assignedTechnicianId: string | null | undefined;
+    } = {
+      reference: undefined,
+      assignedTechnicianId: undefined,
+    };
     try {
       const recorded =
         await this.eventRepository.recordEventWithWorkOrderLock(
@@ -401,6 +416,10 @@ export class WorkOrderService {
           userId,
           input,
           (lockedWorkOrder) => {
+            workOrderScope.reference = lockedWorkOrder.reference;
+            workOrderScope.assignedTechnicianId =
+              lockedWorkOrder.assignedTechnicianId;
+
             // Verify occurredAt is not prior to work order creation (clock sanity)
             if (
               input.occurredAt.getTime() <
@@ -474,6 +493,8 @@ export class WorkOrderService {
       void this.realtime.broadcastToOrganisation(context.organisationId, {
         type: 'PROGRESS_EVENT_ADDED',
         workOrderId,
+        reference: workOrderScope.reference,
+        assignedTechnicianId: workOrderScope.assignedTechnicianId,
         data: recorded,
       });
 
