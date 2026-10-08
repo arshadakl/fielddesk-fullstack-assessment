@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LoaderCircle } from 'lucide-react';
@@ -18,10 +18,10 @@ export function SessionBoundary({
   const { session, checking, changing } = useSession();
   const pathname = usePathname();
   const router = useRouter();
+  const hasInitialUser = Boolean(session.data);
   const waiting =
-    checking ||
     session.isPending ||
-    (mode !== 'guest' && session.isFetching) ||
+    (!hasInitialUser && (checking || session.isFetching)) ||
     (changing && (mode !== 'guest' || Boolean(session.data)));
   const authenticated = Boolean(session.data);
   const redirect =

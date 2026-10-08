@@ -1,8 +1,8 @@
-﻿'use client';
+'use client';
 import type { ReactNode } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { LayoutDashboard, LogOut, Wrench } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { LayoutDashboard, LogOut, Settings, Users, Wrench, Briefcase } from 'lucide-react';
+import { NavLink } from '@/components/navigation-progress';
 import { useSession } from '@/modules/auth/hooks/use-session';
 import { ThemeSelector } from '@/modules/theme/theme-selector';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,10 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const logoutMutation = useLogout();
   const router = useRouter();
+  const pathname = usePathname();
   const user = session.data;
   if (!user) return null;
+
   async function signOut(): Promise<void> {
     try {
       await logoutMutation.mutateAsync();
@@ -22,6 +24,38 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
       /* Keep the screen and present the mutation error. */
     }
   }
+
+  const navItems = [
+    {
+      label: 'Dashboard',
+      href: '/dashboard',
+      icon: LayoutDashboard,
+      show: true,
+      exact: true,
+    },
+    {
+      label: user.role === 'TECHNICIAN' ? 'My Work Orders' : 'Work Orders',
+      href: '/work-orders',
+      icon: Briefcase,
+      show: true,
+      exact: false,
+    },
+    {
+      label: 'Users',
+      href: '/users',
+      icon: Users,
+      show: user.role === 'OWNER',
+      exact: false,
+    },
+    {
+      label: 'Settings',
+      href: '/settings',
+      icon: Settings,
+      show: user.role === 'OWNER',
+      exact: false,
+    },
+  ].filter((item) => item.show);
+
   return (
     <div className="min-h-screen">
       <a
@@ -33,13 +67,13 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
       <header className="border-b border-border bg-card px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <Link
+            <NavLink
               href="/dashboard"
               className="flex items-center gap-2 text-lg font-semibold"
             >
               <Wrench className="size-5 text-primary" aria-hidden="true" />
               FieldDesk
-            </Link>
+            </NavLink>
             <p className="mt-1 break-words text-sm text-muted-foreground">
               {user.organisation.name}
             </p>
@@ -61,15 +95,28 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
       </header>
       <div className="mx-auto grid max-w-6xl gap-6 px-5 py-7 md:grid-cols-[200px_1fr] sm:px-8">
         <aside>
-          <nav aria-label="Main navigation">
-            <Link
-              href="/dashboard"
-              aria-current="page"
-              className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-3 text-sm font-medium text-primary"
-            >
-              <LayoutDashboard className="size-4" aria-hidden="true" />
-              Dashboard
-            </Link>
+          <nav aria-label="Main navigation" className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = item.exact
+                ? pathname === item.href
+                : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                  {item.label}
+                </NavLink>
+              );
+            })}
           </nav>
           <div className="mt-5 rounded-lg border border-border bg-card p-4">
             <p className="break-words text-sm font-medium">{user.name}</p>

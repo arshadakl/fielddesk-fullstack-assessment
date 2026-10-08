@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { SessionBoundary } from '@/modules/auth/components/session-boundary';
 import { ApplicationShell } from '@/modules/layout/application-shell';
+import { NavigationProgressBar } from '@/components/navigation-progress';
+
 export default function AuthenticatedLayout({
   children,
 }: {
@@ -8,7 +10,9 @@ export default function AuthenticatedLayout({
 }) {
   return (
     <SessionBoundary>
-      <ApplicationShell>{children}</ApplicationShell>
+      <NavigationProgressBar>
+        <ApplicationShell>{children}</ApplicationShell>
+      </NavigationProgressBar>
     </SessionBoundary>
   );
 }
