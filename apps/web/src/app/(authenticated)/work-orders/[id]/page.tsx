@@ -17,6 +17,7 @@ import { PriorityBadge, StatusBadge } from '@/modules/work-orders/_components/ba
 import { formatScheduleWindow } from '@/modules/work-orders/_utils/schedule-formatter';
 import { AssignTechnicianDialog } from '../_components/assign-technician-dialog';
 import { ActivityTimeline } from '@/modules/work-orders/_components/activity-timeline';
+import { AttachmentsPanel } from '@/modules/work-orders/_components/attachments-panel';
 import {
   SubmitProgressDialog,
   type ProgressDialogConfig,
@@ -214,6 +215,15 @@ export default function WorkOrderDetailPage() {
               </div>
             </dl>
           </section>
+
+          {/* Attachments & Photos Panel */}
+          <AttachmentsPanel
+            workOrderId={order.id}
+            isTechnician={isTechnician}
+            isAssignedToMe={isAssignedToMe}
+            currentUserId={user?.id}
+            isOwner={user?.role === 'OWNER'}
+          />
 
           {/* Activity History & Audit Trail */}
           <section className="rounded-xl border border-border bg-card p-6">
