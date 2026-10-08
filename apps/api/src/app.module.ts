@@ -10,11 +10,13 @@ import { DatabaseModule } from './database/database.module';
 import { AuthGuard } from './http/guards/auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { UserModule } from './modules/user/user.module';
 import { WorkOrderModule } from './modules/work-order/work-order.module';
 import { AuthRoutesModule } from './routes/auth/auth-routes.module';
 import { HealthRoutesModule } from './routes/health/health-routes.module';
 import { OrganisationRoutesModule } from './routes/organisation/organisation-routes.module';
+import { RealtimeRoutesModule } from './routes/realtime/realtime-routes.module';
 import { UsersRoutesModule } from './routes/users/users-routes.module';
 import { WorkOrdersRoutesModule } from './routes/work-orders/work-orders-routes.module';
 
@@ -33,10 +35,12 @@ import { WorkOrdersRoutesModule } from './routes/work-orders/work-orders-routes.
     UserModule,
     WorkOrderModule,
     NotificationModule,
+    RealtimeModule,
     AuthRoutesModule,
     UsersRoutesModule,
     OrganisationRoutesModule,
     WorkOrdersRoutesModule,
+    RealtimeRoutesModule,
     HealthRoutesModule,
   ],
   controllers: [AppController],

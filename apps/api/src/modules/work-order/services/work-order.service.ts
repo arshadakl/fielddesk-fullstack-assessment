@@ -12,6 +12,7 @@ import type { TenantContext } from '../../../common/interfaces/tenant-context.in
 import { PrismaService } from '../../../database/prisma.service';
 import type { NotificationRepositoryPort } from '../../notification/interfaces/notification.interface';
 import { UserService } from '../../user/services/user.service';
+import { RealtimeService } from '../../realtime/services/realtime.service';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
 import type { WorkOrderRepositoryPort } from '../interfaces/work-order-repository.interface';
 import { WORK_ORDER_EVENT_REPOSITORY } from '../interfaces/work-order-event.interface';
@@ -52,6 +53,7 @@ export class WorkOrderService {
     private readonly notificationRepository: NotificationRepositoryPort,
     private readonly prisma: PrismaService,
     private readonly users: UserService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async getById(
@@ -132,13 +134,21 @@ export class WorkOrderService {
       }
     }
 
-    return this.repository.create(context.organisationId, {
+    const created = await this.repository.create(context.organisationId, {
       ...input,
       title: input.title.trim(),
       description: input.description.trim(),
       siteName: input.siteName.trim(),
       creatorId,
     });
+
+    void this.realtime.broadcastToOrganisation(context.organisationId, {
+      type: 'WORK_ORDER_CREATED',
+      workOrderId: created.id,
+      data: created,
+    });
+
+    return created;
   }
 
   async update(
@@ -173,6 +183,13 @@ export class WorkOrderService {
     if (!updated) {
       throw new NotFoundException('Resource not found');
     }
+
+    void this.realtime.broadcastToOrganisation(context.organisationId, {
+      type: 'WORK_ORDER_UPDATED',
+      workOrderId: updated.id,
+      data: updated,
+    });
+
     return updated;
   }
 
@@ -252,6 +269,12 @@ export class WorkOrderService {
       return result;
     });
 
+    void this.realtime.broadcastToOrganisation(context.organisationId, {
+      type: 'WORK_ORDER_ASSIGNED',
+      workOrderId: updated.id,
+      data: updated,
+    });
+
     return updated;
   }
 
@@ -298,6 +321,13 @@ export class WorkOrderService {
     if (!updated) {
       throw new NotFoundException('Resource not found');
     }
+
+    void this.realtime.broadcastToOrganisation(context.organisationId, {
+      type: 'WORK_ORDER_STATUS_CHANGED',
+      workOrderId: updated.id,
+      data: updated,
+    });
+
     return updated;
   }
 
@@ -364,81 +394,90 @@ export class WorkOrderService {
 
     // 3. Record event and execute status transition atomically under row lock
     try {
-      return await this.eventRepository.recordEventWithWorkOrderLock(
-        context.organisationId,
-        workOrderId,
-        userId,
-        input,
-        (lockedWorkOrder) => {
-          // Verify occurredAt is not prior to work order creation (clock sanity)
-          if (
-            input.occurredAt.getTime() <
-            lockedWorkOrder.createdAt.getTime() - 60 * 1000
-          ) {
-            throw new BadRequestException(
-              'Event timestamp cannot precede work order creation',
-            );
-          }
-
-          // Technicians can only submit progress events for work orders assigned to them
-          if (
-            userRole === 'TECHNICIAN' &&
-            lockedWorkOrder.assignedTechnicianId !== userId
-          ) {
-            throw new NotFoundException('Resource not found');
-          }
-
-          // Determine if payload demands a status change
-          const requestedStatusRaw = input.payload.status;
-          if (
-            typeof requestedStatusRaw !== 'string' ||
-            requestedStatusRaw.trim().length === 0
-          ) {
-            return null;
-          }
-
-          const normalizedStatus =
-            requestedStatusRaw.toUpperCase() as WorkOrderStatus;
-          if (
-            ![
-              'DRAFT',
-              'SCHEDULED',
-              'IN_PROGRESS',
-              'COMPLETED',
-              'CANCELLED',
-            ].includes(normalizedStatus)
-          ) {
-            throw new BadRequestException(
-              `Unknown status: ${requestedStatusRaw}`,
-            );
-          }
-
-          if (normalizedStatus === lockedWorkOrder.status) {
-            return null;
-          }
-
-          // Enforce role-based restrictions on status update
-          if (userRole === 'TECHNICIAN') {
+      const recorded =
+        await this.eventRepository.recordEventWithWorkOrderLock(
+          context.organisationId,
+          workOrderId,
+          userId,
+          input,
+          (lockedWorkOrder) => {
+            // Verify occurredAt is not prior to work order creation (clock sanity)
             if (
-              normalizedStatus !== 'IN_PROGRESS' &&
-              normalizedStatus !== 'COMPLETED'
+              input.occurredAt.getTime() <
+              lockedWorkOrder.createdAt.getTime() - 60 * 1000
             ) {
-              throw new ForbiddenException(
-                'Technicians may only update status to IN_PROGRESS or COMPLETED',
+              throw new BadRequestException(
+                'Event timestamp cannot precede work order creation',
               );
             }
-          }
 
-          const allowed = PERMITTED_TRANSITIONS[lockedWorkOrder.status];
-          if (!allowed.includes(normalizedStatus)) {
-            throw new ConflictException(
-              `Invalid status transition from ${lockedWorkOrder.status} to ${normalizedStatus}`,
-            );
-          }
+            // Technicians can only submit progress events for work orders assigned to them
+            if (
+              userRole === 'TECHNICIAN' &&
+              lockedWorkOrder.assignedTechnicianId !== userId
+            ) {
+              throw new NotFoundException('Resource not found');
+            }
 
-          return normalizedStatus;
-        },
-      );
+            // Determine if payload demands a status change
+            const requestedStatusRaw = input.payload.status;
+            if (
+              typeof requestedStatusRaw !== 'string' ||
+              requestedStatusRaw.trim().length === 0
+            ) {
+              return null;
+            }
+
+            const normalizedStatus =
+              requestedStatusRaw.toUpperCase() as WorkOrderStatus;
+            if (
+              ![
+                'DRAFT',
+                'SCHEDULED',
+                'IN_PROGRESS',
+                'COMPLETED',
+                'CANCELLED',
+              ].includes(normalizedStatus)
+            ) {
+              throw new BadRequestException(
+                `Unknown status: ${requestedStatusRaw}`,
+              );
+            }
+
+            if (normalizedStatus === lockedWorkOrder.status) {
+              return null;
+            }
+
+            // Enforce role-based restrictions on status update
+            if (userRole === 'TECHNICIAN') {
+              if (
+                normalizedStatus !== 'IN_PROGRESS' &&
+                normalizedStatus !== 'COMPLETED'
+              ) {
+                throw new ForbiddenException(
+                  'Technicians may only update status to IN_PROGRESS or COMPLETED',
+                );
+              }
+            }
+
+            const allowed = PERMITTED_TRANSITIONS[lockedWorkOrder.status];
+            if (!allowed.includes(normalizedStatus)) {
+              throw new ConflictException(
+                `Invalid status transition from ${lockedWorkOrder.status} to ${normalizedStatus}`,
+              );
+            }
+
+            return normalizedStatus;
+          },
+        );
+
+      void this.realtime.broadcastToOrganisation(context.organisationId, {
+        type: 'PROGRESS_EVENT_ADDED',
+        workOrderId,
+        data: recorded,
+      });
+
+      return recorded;
     } catch (err: unknown) {
       if (err instanceof Error && err.message === 'WORK_ORDER_NOT_FOUND') {
         throw new NotFoundException('Resource not found');
