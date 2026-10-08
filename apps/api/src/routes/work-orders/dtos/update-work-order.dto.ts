@@ -10,7 +10,11 @@ import {
 } from 'class-validator';
 
 export class UpdateWorkOrderDto {
-  @ApiPropertyOptional({ minLength: 2, maxLength: 100, example: 'Updated HVAC repair title' })
+  @ApiPropertyOptional({
+    minLength: 2,
+    maxLength: 100,
+    example: 'Updated HVAC repair title',
+  })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )

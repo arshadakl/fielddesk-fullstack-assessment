@@ -1,8 +1,14 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 
 import { UserService } from '../../user/services/user.service';
+import { WORK_ORDER_EVENT_REPOSITORY } from '../interfaces/work-order-event.interface';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
 import type { WorkOrderRepositoryPort } from '../interfaces/work-order-repository.interface';
 import type { WorkOrderSummary } from '../interfaces/work-order.interface';
@@ -17,9 +23,14 @@ describe('WorkOrderService', () => {
   let updateAssignmentMock: jest.Mock;
   let updateStatusMock: jest.Mock;
 
+  let findByEventIdMock: jest.Mock;
+  let listByWorkOrderIdMock: jest.Mock;
+  let recordEventWithWorkOrderLockMock: jest.Mock;
+
   let getUserByIdMock: jest.Mock;
 
   let workOrderRepo: WorkOrderRepositoryPort;
+  let eventRepo: unknown;
   let userService: Partial<UserService>;
   let module: TestingModule;
   let service: WorkOrderService;
@@ -53,6 +64,10 @@ describe('WorkOrderService', () => {
     updateAssignmentMock = jest.fn();
     updateStatusMock = jest.fn();
 
+    findByEventIdMock = jest.fn();
+    listByWorkOrderIdMock = jest.fn();
+    recordEventWithWorkOrderLockMock = jest.fn();
+
     getUserByIdMock = jest.fn();
 
     workOrderRepo = {
@@ -65,6 +80,12 @@ describe('WorkOrderService', () => {
       updateStatus: updateStatusMock,
     };
 
+    eventRepo = {
+      findByEventId: findByEventIdMock,
+      listByWorkOrderId: listByWorkOrderIdMock,
+      recordEventWithWorkOrderLock: recordEventWithWorkOrderLockMock,
+    };
+
     userService = {
       getById: getUserByIdMock,
     };
@@ -73,6 +94,7 @@ describe('WorkOrderService', () => {
       providers: [
         WorkOrderService,
         { provide: WORK_ORDER_REPOSITORY, useValue: workOrderRepo },
+        { provide: WORK_ORDER_EVENT_REPOSITORY, useValue: eventRepo },
         { provide: UserService, useValue: userService },
       ],
     }).compile();
@@ -311,6 +333,189 @@ describe('WorkOrderService', () => {
         tenant.organisationId,
         'wo-1',
         { status: 'IN_PROGRESS' },
+      );
+    });
+  });
+
+  describe('Progress Events & Idempotency', () => {
+    const sampleEventInput = {
+      eventId: 'evt-10001',
+      type: 'STATUS_CHANGED' as const,
+      occurredAt: new Date('2026-08-04T10:30:00Z'),
+      payload: { status: 'in_progress', note: 'Technician on site' },
+    };
+
+    it('returns existing event when eventId was already processed for this tenant (idempotent)', async () => {
+      const existingSummary = {
+        id: 'event-uuid-1',
+        eventId: 'evt-10001',
+        organisationId: tenant.organisationId,
+        workOrderId: 'wo-1',
+        userId: 'tech-1',
+        userName: 'Rahul',
+        userRole: 'TECHNICIAN',
+        type: 'STATUS_CHANGED' as const,
+        occurredAt: new Date('2026-08-04T10:30:00Z'),
+        payload: { status: 'in_progress', note: 'Technician on site' },
+        createdAt: new Date('2026-08-04T10:30:01Z'),
+      };
+      findByEventIdMock.mockResolvedValue(existingSummary);
+
+      const result = await service.submitProgressEvent(
+        tenant,
+        'wo-1',
+        sampleEventInput,
+        'TECHNICIAN',
+        'tech-1',
+      );
+
+      expect(result).toEqual(existingSummary);
+      expect(recordEventWithWorkOrderLockMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects duplicate eventId when associated with a different work order', async () => {
+      findByEventIdMock.mockResolvedValue({
+        id: 'event-uuid-1',
+        eventId: 'evt-10001',
+        organisationId: tenant.organisationId,
+        workOrderId: 'wo-DIFFERENT',
+      });
+
+      await expect(
+        service.submitProgressEvent(
+          tenant,
+          'wo-1',
+          sampleEventInput,
+          'TECHNICIAN',
+          'tech-1',
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects technician attempting to submit progress event on unassigned work order', async () => {
+      findByEventIdMock.mockResolvedValue(null);
+      recordEventWithWorkOrderLockMock.mockImplementation(
+        (
+          _orgId: string,
+          _woId: string,
+          _uId: string,
+          _inp: unknown,
+          validator: (locked: {
+            id: string;
+            status: string;
+            assignedTechnicianId: string | null;
+            createdAt: Date;
+          }) => string | null,
+        ) => {
+          validator({
+            id: 'wo-1',
+            status: 'SCHEDULED',
+            assignedTechnicianId: 'tech-SOMEONE-ELSE',
+            createdAt: new Date('2026-08-01T00:00:00Z'),
+          });
+          return Promise.resolve(null);
+        },
+      );
+
+      await expect(
+        service.submitProgressEvent(
+          tenant,
+          'wo-1',
+          sampleEventInput,
+          'TECHNICIAN',
+          'tech-1',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('executes atomic status transition and creates event record under lock', async () => {
+      findByEventIdMock.mockResolvedValue(null);
+
+      const createdEvent = {
+        id: 'evt-new-uuid',
+        eventId: 'evt-10001',
+        organisationId: tenant.organisationId,
+        workOrderId: 'wo-1',
+        userId: 'tech-1',
+        userName: 'Rahul',
+        userRole: 'TECHNICIAN',
+        type: 'STATUS_CHANGED' as const,
+        occurredAt: sampleEventInput.occurredAt,
+        payload: sampleEventInput.payload,
+        createdAt: new Date(),
+      };
+      recordEventWithWorkOrderLockMock.mockImplementation(
+        (
+          _orgId: string,
+          _woId: string,
+          _uId: string,
+          _inp: unknown,
+          validator: (locked: {
+            id: string;
+            status: string;
+            assignedTechnicianId: string | null;
+            createdAt: Date;
+          }) => string | null,
+        ) => {
+          const next = validator({
+            id: 'wo-1',
+            status: 'SCHEDULED',
+            assignedTechnicianId: 'tech-1',
+            createdAt: new Date('2026-08-01T00:00:00Z'),
+          });
+          expect(next).toBe('IN_PROGRESS');
+          return Promise.resolve(createdEvent);
+        },
+      );
+
+      const result = await service.submitProgressEvent(
+        tenant,
+        'wo-1',
+        sampleEventInput,
+        'TECHNICIAN',
+        'tech-1',
+      );
+
+      expect(result).toEqual(createdEvent);
+      expect(recordEventWithWorkOrderLockMock).toHaveBeenCalled();
+    });
+
+    it('rejects events with timestamps in the far future', async () => {
+      const futureDate = new Date(Date.now() + 60 * 60 * 1000); // 1 hour in future
+      await expect(
+        service.submitProgressEvent(
+          tenant,
+          'wo-1',
+          { ...sampleEventInput, occurredAt: futureDate },
+          'TECHNICIAN',
+          'tech-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lists events for a permitted technician', async () => {
+      findWorkOrderByIdMock.mockResolvedValue({
+        ...mockWorkOrder,
+        assignedTechnicianId: 'tech-1',
+      });
+      listByWorkOrderIdMock.mockResolvedValue([
+        {
+          id: 'evt-1',
+          eventId: 'evt-10001',
+          type: 'STATUS_CHANGED',
+        },
+      ]);
+
+      const events = await service.listEvents(
+        tenant,
+        'wo-1',
+        'TECHNICIAN',
+        'tech-1',
+      );
+      expect(events).toHaveLength(1);
+      expect(listByWorkOrderIdMock).toHaveBeenCalledWith(
+        tenant.organisationId,
+        'wo-1',
       );
     });
   });

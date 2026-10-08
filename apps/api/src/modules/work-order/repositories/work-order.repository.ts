@@ -1,5 +1,9 @@
 import type { Prisma } from '@fielddesk/database';
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 
 import { PrismaService } from '../../../database/prisma.service';
 import type {
