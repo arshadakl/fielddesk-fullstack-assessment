@@ -18,6 +18,6 @@ import { WorkOrderService } from './services/work-order.service';
     },
     WorkOrderService,
   ],
-  exports: [WorkOrderService],
+  exports: [WorkOrderService, WORK_ORDER_REPOSITORY],
 })
 export class WorkOrderModule {}
