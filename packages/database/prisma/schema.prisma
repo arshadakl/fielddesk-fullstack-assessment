@@ -41,24 +41,26 @@ model Organisation {
   workOrders        WorkOrder[]
   events            WorkOrderEvent[]
   attachments       Attachment[]
+  notifications     NotificationOutbox[]
 }
 
 model User {
-  id                  String           @id @default(uuid()) @db.Uuid
-  organisationId      String           @db.Uuid
-  organisation        Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  email               String           @unique
+  id                  String               @id @default(uuid()) @db.Uuid
+  organisationId      String               @db.Uuid
+  organisation        Organisation         @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  email               String               @unique
   name                String
   passwordHash        String
   role                UserRole
-  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime         @updatedAt @db.Timestamptz(3)
-  authVersion         Int              @default(0)
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(3)
+  authVersion         Int                  @default(0)
   sessions            Session[]
-  createdWorkOrders   WorkOrder[]      @relation("WorkOrderCreator")
-  assignedWorkOrders  WorkOrder[]      @relation("WorkOrderAssignedTechnician")
+  createdWorkOrders   WorkOrder[]          @relation("WorkOrderCreator")
+  assignedWorkOrders  WorkOrder[]          @relation("WorkOrderAssignedTechnician")
   workOrderEvents     WorkOrderEvent[]
   uploadedAttachments Attachment[]
+  notifications       NotificationOutbox[]
 
   @@unique([organisationId, id])
   @@index([organisationId])
@@ -95,10 +97,11 @@ model WorkOrder {
   assignedTechnician   User?             @relation("WorkOrderAssignedTechnician", fields: [assignedTechnicianId], references: [id], onDelete: Restrict)
   scheduledStart       DateTime?         @db.Timestamptz(3)
   scheduledEnd         DateTime?         @db.Timestamptz(3)
-  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  createdAt            DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime             @updatedAt @db.Timestamptz(3)
   events               WorkOrderEvent[]
   attachments          Attachment[]
+  notifications        NotificationOutbox[]
 
   @@unique([organisationId, id])
   @@unique([organisationId, reference])
@@ -151,4 +154,60 @@ model Attachment {
   @@index([organisationId, workOrderId, createdAt(sort: Desc)])
   @@index([organisationId, contentHash])
   @@index([organisationId, createdAt])
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+  DEAD_LETTER
+}
+
+enum NotificationChannel {
+  SMS
+  EMAIL
+  PUSH
+}
+
+model NotificationOutbox {
+  id              String                   @id @default(uuid()) @db.Uuid
+  organisationId  String                   @db.Uuid
+  organisation    Organisation             @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  workOrderId     String                   @db.Uuid
+  workOrder       WorkOrder                @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  recipientId     String                   @db.Uuid
+  recipient       User                     @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  channel         NotificationChannel      @default(SMS)
+  idempotencyKey  String                   @db.VarChar(128)
+  payload         Json                     @db.JsonB
+  status          NotificationOutboxStatus @default(PENDING)
+  attemptCount    Int                      @default(0)
+  maxAttempts     Int                      @default(5)
+  nextAttemptAt   DateTime                 @default(now()) @db.Timestamptz(3)
+  lockedAt        DateTime?                @db.Timestamptz(3)
+  lockedBy        String?                  @db.VarChar(64)
+  lastError       String?                  @db.Text
+  deliveredAt     DateTime?                @db.Timestamptz(3)
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime                 @updatedAt @db.Timestamptz(3)
+
+  attempts        NotificationAttempt[]
+
+  @@unique([organisationId, idempotencyKey])
+  @@index([status, nextAttemptAt])
+  @@index([organisationId, workOrderId])
+}
+
+model NotificationAttempt {
+  id            String             @id @default(uuid()) @db.Uuid
+  outboxId      String             @db.Uuid
+  outbox        NotificationOutbox @relation(fields: [outboxId], references: [id], onDelete: Cascade)
+  attemptNumber Int
+  status        String             @db.VarChar(32)
+  errorDetails  String?            @db.Text
+  latencyMs     Int
+  createdAt     DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@index([outboxId, attemptNumber])
 }
