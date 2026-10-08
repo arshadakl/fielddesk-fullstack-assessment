@@ -8,6 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import type { Response } from 'express';
+import { formatCsvRow } from '../../../common/utils/csv-sanitizer';
 import type { TenantContext } from '../../../common/interfaces/tenant-context.interface';
 import { PrismaService } from '../../../database/prisma.service';
 import type { NotificationRepositoryPort } from '../../notification/interfaces/notification.interface';
@@ -99,6 +101,78 @@ export class WorkOrderService {
       effectiveFilter,
       pagination,
     );
+  }
+
+  async exportCsvStream(
+    context: TenantContext,
+    filter: WorkOrderFilterInput,
+    userRole: string,
+    userId: string,
+    response: Response,
+  ): Promise<void> {
+    const effectiveFilter: WorkOrderFilterInput = {
+      ...filter,
+      ...(userRole === 'TECHNICIAN' ? { assignedTechnicianId: userId } : {}),
+    };
+
+    try {
+      // 1. Emit RFC 4180 CSV Header with CRLF
+      const headers = [
+        'Reference',
+        'Title',
+        'Description',
+        'Priority',
+        'Status',
+        'Site Name',
+        'Assigned Technician',
+        'Scheduled Start',
+        'Scheduled End',
+        'Created At',
+        'Updated At',
+      ];
+      response.write(formatCsvRow(headers));
+
+      // 2. Stream database records in memory-bounded batches
+      await this.repository.streamByOrganisation(
+        context.organisationId,
+        effectiveFilter,
+        (batch: WorkOrderSummary[]) => {
+          if (response.destroyed) {
+            return Promise.resolve();
+          }
+          for (const item of batch) {
+            const row = [
+              item.reference,
+              item.title,
+              item.description,
+              item.priority,
+              item.status,
+              item.siteName,
+              item.assignedTechnicianName ?? 'Unassigned',
+              item.scheduledStart ? item.scheduledStart.toISOString() : '',
+              item.scheduledEnd ? item.scheduledEnd.toISOString() : '',
+              item.createdAt.toISOString(),
+              item.updatedAt.toISOString(),
+            ];
+            response.write(formatCsvRow(row));
+          }
+          return Promise.resolve();
+        },
+        100,
+        () => response.destroyed,
+      );
+
+      if (!response.destroyed) {
+        response.end();
+      }
+    } catch (err: unknown) {
+      if (!response.headersSent) {
+        throw err;
+      }
+      if (!response.destroyed) {
+        response.destroy(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
   }
 
   async create(

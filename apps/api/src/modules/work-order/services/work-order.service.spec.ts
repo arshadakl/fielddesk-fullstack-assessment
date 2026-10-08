@@ -13,6 +13,7 @@ import { UserService } from '../../user/services/user.service';
 import { WORK_ORDER_EVENT_REPOSITORY } from '../interfaces/work-order-event.interface';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
 import type { WorkOrderRepositoryPort } from '../interfaces/work-order-repository.interface';
+import type { Response } from 'express';
 import type { WorkOrderSummary } from '../interfaces/work-order.interface';
 import { WorkOrderService } from './work-order.service';
 
@@ -28,6 +29,7 @@ describe('WorkOrderService', () => {
   let findByEventIdMock: jest.Mock;
   let listByWorkOrderIdMock: jest.Mock;
   let recordEventWithWorkOrderLockMock: jest.Mock;
+  let streamByOrganisationMock: jest.Mock;
 
   let getUserByIdMock: jest.Mock;
   let enqueueInTransactionMock: jest.Mock;
@@ -70,6 +72,7 @@ describe('WorkOrderService', () => {
     updateWorkOrderMock = jest.fn();
     updateAssignmentMock = jest.fn();
     updateStatusMock = jest.fn();
+    streamByOrganisationMock = jest.fn();
 
     findByEventIdMock = jest.fn();
     listByWorkOrderIdMock = jest.fn();
@@ -81,6 +84,7 @@ describe('WorkOrderService', () => {
     workOrderRepo = {
       findById: findWorkOrderByIdMock,
       listByOrganisation: listByOrganisationMock,
+      streamByOrganisation: streamByOrganisationMock,
       countByOrganisation: countByOrganisationMock,
       create: createWorkOrderMock,
       update: updateWorkOrderMock,
@@ -650,6 +654,87 @@ describe('WorkOrderService', () => {
       expect(listByWorkOrderIdMock).toHaveBeenCalledWith(
         tenant.organisationId,
         'wo-1',
+      );
+    });
+  });
+
+  describe('CSV Export', () => {
+    it('streams RFC 4180 CSV with sanitized formula cells and role scoping', async () => {
+      const writtenChunks: string[] = [];
+      const endMock = jest.fn();
+      const mockResponse = {
+        write: jest.fn((chunk: string) => writtenChunks.push(chunk)),
+        end: endMock,
+      } as unknown as Response;
+
+      const dangerousWorkOrder: WorkOrderSummary = {
+        ...mockWorkOrder,
+        title: '=1+1 dangerous formula',
+        description: '+SUM(A1:A5)',
+        siteName: '-cmd|calc',
+        scheduledStart: new Date('2026-08-04T10:00:00.000Z'),
+        scheduledEnd: new Date('2026-08-04T12:00:00.000Z'),
+        createdAt: new Date('2026-08-01T09:00:00.000Z'),
+        updatedAt: new Date('2026-08-01T09:00:00.000Z'),
+      };
+
+      streamByOrganisationMock.mockImplementation(
+        async (
+          _orgId: string,
+          _filter: unknown,
+          onBatch: (batch: WorkOrderSummary[]) => Promise<void>,
+        ) => {
+          await onBatch([dangerousWorkOrder]);
+        },
+      );
+
+      await service.exportCsvStream(
+        tenant,
+        { search: 'test' },
+        'OWNER',
+        'owner-1',
+        mockResponse,
+      );
+
+      // Verify CSV header row is written first
+      expect(writtenChunks[0]).toContain(
+        '"Reference","Title","Description","Priority","Status","Site Name","Assigned Technician"',
+      );
+
+      // Verify formula cells are sanitized with leading single quote
+      const dataRow = writtenChunks[1];
+      expect(dataRow).toContain('"\'=1+1 dangerous formula"');
+      expect(dataRow).toContain('"\' +SUM(A1:A5)"'.replace(' ', ''));
+      expect(dataRow).toContain('"\'-cmd|calc"');
+
+      // Verify response.end is called
+      expect(endMock).toHaveBeenCalled();
+    });
+
+    it('enforces technician scoping during export', async () => {
+      const mockResponse = {
+        write: jest.fn(),
+        end: jest.fn(),
+      } as unknown as Response;
+
+      streamByOrganisationMock.mockResolvedValue(undefined);
+
+      await service.exportCsvStream(
+        tenant,
+        {},
+        'TECHNICIAN',
+        'tech-123',
+        mockResponse,
+      );
+
+      expect(streamByOrganisationMock).toHaveBeenCalledWith(
+        tenant.organisationId,
+        expect.objectContaining({
+          assignedTechnicianId: 'tech-123',
+        }),
+        expect.any(Function),
+        100,
+        expect.any(Function),
       );
     });
   });

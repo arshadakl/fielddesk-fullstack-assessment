@@ -27,6 +27,14 @@ export interface WorkOrderRepositoryPort {
     pagination: PaginationParams,
   ): Promise<PaginatedWorkOrders>;
 
+  streamByOrganisation(
+    organisationId: string,
+    filter: WorkOrderFilterInput,
+    onBatch: (batch: WorkOrderSummary[]) => Promise<void>,
+    batchSize?: number,
+    shouldAbort?: () => boolean,
+  ): Promise<void>;
+
   countByOrganisation(organisationId: string): Promise<number>;
 
   create(

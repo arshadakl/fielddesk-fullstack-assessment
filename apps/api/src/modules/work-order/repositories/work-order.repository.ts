@@ -125,6 +125,62 @@ export class WorkOrderRepository implements WorkOrderRepositoryPort {
     };
   }
 
+  async streamByOrganisation(
+    organisationId: string,
+    filter: WorkOrderFilterInput,
+    onBatch: (batch: WorkOrderSummary[]) => Promise<void>,
+    batchSize: number = 100,
+    shouldAbort?: () => boolean,
+  ): Promise<void> {
+    const trimmedSearch = filter.search?.trim();
+    const where: Prisma.WorkOrderWhereInput = {
+      organisationId,
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.priority ? { priority: filter.priority } : {}),
+      ...(filter.assignedTechnicianId
+        ? { assignedTechnicianId: filter.assignedTechnicianId }
+        : {}),
+      ...(trimmedSearch
+        ? {
+            OR: [
+              { title: { contains: trimmedSearch, mode: 'insensitive' } },
+              { reference: { contains: trimmedSearch, mode: 'insensitive' } },
+              { siteName: { contains: trimmedSearch, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    let page = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      if (shouldAbort && shouldAbort()) {
+        break;
+      }
+
+      const records = await this.database.client.workOrder.findMany({
+        where,
+        select: workOrderSelect,
+        orderBy: { createdAt: 'desc' },
+        skip: page * batchSize,
+        take: batchSize,
+      });
+
+      if (records.length === 0 || (shouldAbort && shouldAbort())) {
+        break;
+      }
+
+      await onBatch(records.map(mapWorkOrder));
+
+      if (records.length < batchSize) {
+        hasMore = false;
+      } else {
+        page += 1;
+      }
+    }
+  }
+
   countByOrganisation(organisationId: string): Promise<number> {
     return this.database.client.workOrder.count({
       where: { organisationId },

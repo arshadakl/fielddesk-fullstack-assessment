@@ -34,6 +34,7 @@ import { WorkOrderService } from '../../modules/work-order/services/work-order.s
 import { AssignWorkOrderDto } from './dtos/assign-work-order.dto';
 import { AttachmentResDto } from './dtos/attachment-res.dto';
 import { CreateWorkOrderDto } from './dtos/create-work-order.dto';
+import { ExportWorkOrdersQueryDto } from './dtos/export-work-orders-query.dto';
 import { ListWorkOrdersQueryDto } from './dtos/list-work-orders-query.dto';
 import { UpdateWorkOrderStatusDto } from './dtos/update-work-order-status.dto';
 import { UpdateWorkOrderDto } from './dtos/update-work-order.dto';
@@ -72,6 +73,43 @@ export class WorkOrdersController {
       identity.id,
     );
     return WorkOrderListResDto.fromData(result);
+  }
+
+  @Get('export')
+  @ApiOperation({ summary: 'Stream organization work orders as sanitized CSV' })
+  @ApiResponse({
+    status: 200,
+    description: 'RFC 4180 compliant CSV stream with formula injection sanitization',
+  })
+  async export(
+    @CurrentIdentity() identity: Identity,
+    @Query() query: ExportWorkOrdersQueryDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const context = { organisationId: identity.organisation.id };
+    const today = new Date().toISOString().split('T')[0];
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="work-orders-${today}.csv"`,
+    );
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    await this.workOrders.exportCsvStream(
+      context,
+      {
+        status: query.status,
+        priority: query.priority,
+        assignedTechnicianId: query.assignedTechnicianId,
+        search: query.search,
+      },
+      identity.role,
+      identity.id,
+      res,
+    );
   }
 
   @Post()

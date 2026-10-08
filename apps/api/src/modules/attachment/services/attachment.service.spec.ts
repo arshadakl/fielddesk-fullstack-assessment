@@ -87,6 +87,7 @@ describe('AttachmentService', () => {
     mockWorkOrderRepo = {
       findById: findWorkOrderByIdMock,
       listByOrganisation: jest.fn(),
+      streamByOrganisation: jest.fn(),
       countByOrganisation: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
