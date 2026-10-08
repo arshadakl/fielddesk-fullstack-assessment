@@ -273,6 +273,22 @@ export class WorkOrderService {
       return result;
     });
 
+    // If this work order was previously assigned to a different technician,
+    // broadcast a dedicated unassignment event scoped strictly to them so their UI
+    // removes the item instantly without revealing the new technician's identity.
+    const previousTechnicianId = existing.assignedTechnicianId;
+    if (
+      previousTechnicianId &&
+      previousTechnicianId !== updated.assignedTechnicianId
+    ) {
+      void this.realtime.broadcastToOrganisation(context.organisationId, {
+        type: 'WORK_ORDER_UNASSIGNED',
+        workOrderId: updated.id,
+        reference: updated.reference,
+        assignedTechnicianId: previousTechnicianId,
+      });
+    }
+
     void this.realtime.broadcastToOrganisation(context.organisationId, {
       type: 'WORK_ORDER_ASSIGNED',
       workOrderId: updated.id,

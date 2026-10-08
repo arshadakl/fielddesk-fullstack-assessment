@@ -35,6 +35,10 @@ describe('WorkOrderService', () => {
   let workOrderRepo: WorkOrderRepositoryPort;
   let eventRepo: unknown;
   let userService: Partial<UserService>;
+  let mockRealtime: {
+    broadcastToOrganisation: jest.Mock;
+    createEventStream: jest.Mock;
+  };
   let module: TestingModule;
   let service: WorkOrderService;
 
@@ -108,7 +112,7 @@ describe('WorkOrderService', () => {
       markPermanentFailure: jest.fn().mockResolvedValue(undefined),
     };
 
-    const mockRealtime = {
+    mockRealtime = {
       broadcastToOrganisation: jest.fn().mockResolvedValue(undefined),
       createEventStream: jest.fn(),
     };
@@ -339,6 +343,67 @@ describe('WorkOrderService', () => {
             technicianName: 'Rahul Sharma',
             title: mockWorkOrder.title,
           }) as unknown,
+        }),
+      );
+
+      expect(mockRealtime.broadcastToOrganisation).toHaveBeenCalledWith(
+        tenant.organisationId,
+        expect.objectContaining({
+          type: 'WORK_ORDER_ASSIGNED',
+          workOrderId: 'wo-1',
+          assignedTechnicianId: 'tech-1',
+        }),
+      );
+    });
+
+    it('broadcasts WORK_ORDER_UNASSIGNED to the previous technician when reassigned', async () => {
+      findWorkOrderByIdMock.mockResolvedValue({
+        ...mockWorkOrder,
+        assignedTechnicianId: 'tech-1',
+        status: 'SCHEDULED',
+      });
+      getUserByIdMock.mockResolvedValue({
+        id: 'tech-2',
+        name: 'Amit Patel',
+        role: 'TECHNICIAN',
+      });
+
+      const start = new Date(Date.now() + 60 * 60 * 1000);
+      const end = new Date(Date.now() + 120 * 60 * 1000);
+      const reassignedMock = {
+        ...mockWorkOrder,
+        assignedTechnicianId: 'tech-2',
+        scheduledStart: start,
+        scheduledEnd: end,
+        status: 'SCHEDULED',
+      };
+      updateAssignmentMock.mockResolvedValue(reassignedMock);
+
+      await service.assign(tenant, 'wo-1', {
+        assignedTechnicianId: 'tech-2',
+        scheduledStart: start,
+        scheduledEnd: end,
+      });
+
+      // 1. Must broadcast unassignment to the old technician
+      expect(mockRealtime.broadcastToOrganisation).toHaveBeenCalledWith(
+        tenant.organisationId,
+        expect.objectContaining({
+          type: 'WORK_ORDER_UNASSIGNED',
+          workOrderId: 'wo-1',
+          reference: mockWorkOrder.reference,
+          assignedTechnicianId: 'tech-1',
+        }),
+      );
+
+      // 2. Must broadcast assignment to the new technician
+      expect(mockRealtime.broadcastToOrganisation).toHaveBeenCalledWith(
+        tenant.organisationId,
+        expect.objectContaining({
+          type: 'WORK_ORDER_ASSIGNED',
+          workOrderId: 'wo-1',
+          reference: mockWorkOrder.reference,
+          assignedTechnicianId: 'tech-2',
         }),
       );
     });
