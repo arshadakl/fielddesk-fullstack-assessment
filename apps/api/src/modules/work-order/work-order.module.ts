@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { DatabaseModule } from '../../database/database.module';
 import { UserModule } from '../user/user.module';
+import { NotificationModule } from '../notification/notification.module';
 import { WORK_ORDER_REPOSITORY } from './interfaces/work-order-repository.interface';
 import { WorkOrderRepository } from './repositories/work-order.repository';
 import { WORK_ORDER_EVENT_REPOSITORY } from './interfaces/work-order-event.interface';
@@ -9,7 +10,7 @@ import { WorkOrderEventRepository } from './repositories/work-order-event.reposi
 import { WorkOrderService } from './services/work-order.service';
 
 @Module({
-  imports: [DatabaseModule, UserModule],
+  imports: [DatabaseModule, UserModule, NotificationModule],
   providers: [
     { provide: WORK_ORDER_REPOSITORY, useClass: WorkOrderRepository },
     {

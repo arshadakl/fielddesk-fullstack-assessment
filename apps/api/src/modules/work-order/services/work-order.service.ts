@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 
 import type { TenantContext } from '../../../common/interfaces/tenant-context.interface';
+import { PrismaService } from '../../../database/prisma.service';
+import type { NotificationRepositoryPort } from '../../notification/interfaces/notification.interface';
 import { UserService } from '../../user/services/user.service';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
 import type { WorkOrderRepositoryPort } from '../interfaces/work-order-repository.interface';
@@ -46,6 +48,9 @@ export class WorkOrderService {
     @Inject(WORK_ORDER_EVENT_REPOSITORY)
     private readonly eventRepository: WorkOrderEventRepositoryPort &
       Pick<WorkOrderEventRepository, 'recordEventWithWorkOrderLock'>,
+    @Inject('NotificationRepositoryPort')
+    private readonly notificationRepository: NotificationRepositoryPort,
+    private readonly prisma: PrismaService,
     private readonly users: UserService,
   ) {}
 
@@ -203,16 +208,50 @@ export class WorkOrderService {
       );
     }
 
-    await this.validateTechnician(context, input.assignedTechnicianId);
-
-    const updated = await this.repository.updateAssignment(
-      context.organisationId,
-      workOrderId,
-      input,
+    const technician = await this.validateTechnician(
+      context,
+      input.assignedTechnicianId,
     );
-    if (!updated) {
-      throw new NotFoundException('Resource not found');
-    }
+
+    // Atomically execute assignment and transactional outbox write
+    // If the database transaction rolls back, zero notification records are ever published
+    const updated = await this.prisma.client.$transaction(async (tx) => {
+      const result = await this.repository.updateAssignment(
+        context.organisationId,
+        workOrderId,
+        input,
+        tx,
+      );
+
+      if (!result) {
+        throw new NotFoundException('Resource not found');
+      }
+
+      // Generate deterministic idempotency key for this specific assignment version
+      const idempotencyKey = `assign_${workOrderId}_${input.assignedTechnicianId}_${input.scheduledStart.getTime()}`;
+
+      await this.notificationRepository.enqueueInTransaction(tx, {
+        organisationId: context.organisationId,
+        workOrderId,
+        recipientId: input.assignedTechnicianId,
+        channel: 'SMS',
+        idempotencyKey,
+        payload: {
+          workOrderId,
+          reference: existing.reference,
+          title: existing.title,
+          siteName: existing.siteName,
+          technicianId: technician.id,
+          technicianName: technician.name,
+          scheduledStart: input.scheduledStart.toISOString(),
+          scheduledEnd: input.scheduledEnd.toISOString(),
+          assignedByUserId: existing.creatorId,
+        },
+      });
+
+      return result;
+    });
+
     return updated;
   }
 
@@ -265,7 +304,7 @@ export class WorkOrderService {
   private async validateTechnician(
     context: TenantContext,
     technicianId: string,
-  ): Promise<void> {
+  ): Promise<{ id: string; name: string; role: string }> {
     let user;
     try {
       user = await this.users.getById(context, technicianId);
@@ -279,6 +318,7 @@ export class WorkOrderService {
         'Assigned user must have the technician role',
       );
     }
+    return user;
   }
 
   async listEvents(

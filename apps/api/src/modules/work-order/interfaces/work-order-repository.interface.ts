@@ -44,6 +44,7 @@ export interface WorkOrderRepositoryPort {
     organisationId: string,
     workOrderId: string,
     input: AssignWorkOrderInput,
+    txClient?: unknown,
   ): Promise<WorkOrderSummary | null>;
 
   updateStatus(

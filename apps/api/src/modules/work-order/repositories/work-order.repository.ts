@@ -207,8 +207,10 @@ export class WorkOrderRepository implements WorkOrderRepositoryPort {
     organisationId: string,
     workOrderId: string,
     input: AssignWorkOrderInput,
+    txClient?: unknown,
   ): Promise<WorkOrderSummary | null> {
-    const existing = await this.database.client.workOrder.findFirst({
+    const client = (txClient as typeof this.database.client) ?? this.database.client;
+    const existing = await client.workOrder.findFirst({
       where: { id: workOrderId, organisationId },
       select: { id: true, status: true },
     });
@@ -217,7 +219,7 @@ export class WorkOrderRepository implements WorkOrderRepositoryPort {
     }
 
     try {
-      const record = await this.database.client.workOrder.update({
+      const record = await client.workOrder.update({
         where: { id: workOrderId },
         data: {
           assignedTechnicianId: input.assignedTechnicianId,
