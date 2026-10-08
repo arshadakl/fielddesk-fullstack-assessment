@@ -3,11 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Calendar, ChevronRight, Plus, Wrench } from 'lucide-react';
+import { Calendar, ChevronRight, Download, Loader2, Plus, Wrench } from 'lucide-react';
+import { toast } from 'sonner';
 import { useSession } from '@/modules/auth/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { downloadWorkOrdersCsv } from '@/modules/work-orders/_api/work-orders-export';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useWorkOrders } from '@/modules/work-orders/_hooks/use-work-orders';
@@ -34,6 +36,7 @@ export default function WorkOrdersPage() {
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [assigningOrder, setAssigningOrder] = React.useState<WorkOrderResDto | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   const { data, isLoading } = useWorkOrders({
     status: statusParam || undefined,
@@ -42,6 +45,24 @@ export default function WorkOrdersPage() {
     page: pageParam,
     limit: 20,
   });
+
+  async function handleExport() {
+    setIsExporting(true);
+    try {
+      await downloadWorkOrdersCsv({
+        status: statusParam || undefined,
+        priority: priorityParam || undefined,
+        search: searchParam || undefined,
+      });
+      toast.success('Work orders exported successfully');
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to export work orders';
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   function updateParams(newParams: Record<string, string | null>) {
     const next = new URLSearchParams(searchParams.toString());
@@ -70,12 +91,26 @@ export default function WorkOrdersPage() {
               : `Manage, schedule, and assign field maintenance jobs for ${user?.organisation.name}.`}
           </p>
         </div>
-        {!isTechnician && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" />
-            New Work Order
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void handleExport()}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            <span>Export CSV</span>
           </Button>
-        )}
+          {!isTechnician && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              New Work Order
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_180px_180px]">
