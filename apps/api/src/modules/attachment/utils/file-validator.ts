@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { BadRequestException } from '@nestjs/common';
 
 export const ALLOWED_MIME_TYPES = [
@@ -76,6 +77,7 @@ export function validateUploadedFile(file: Express.Multer.File): {
   validatedMimeType: AllowedMimeType;
   byteSize: number;
   originalFileName: string;
+  contentHash: string;
 } {
   if (!file || !file.buffer) {
     throw new BadRequestException('No file uploaded or file buffer is empty');
@@ -112,9 +114,12 @@ export function validateUploadedFile(file: Express.Multer.File): {
     .trim()
     .slice(0, 255);
 
+  const contentHash = createHash('sha256').update(file.buffer).digest('hex');
+
   return {
     validatedMimeType: detectedMime,
     byteSize: file.buffer.length,
     originalFileName: sanitizedFileName || 'attachment',
+    contentHash,
   };
 }

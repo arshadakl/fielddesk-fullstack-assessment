@@ -80,6 +80,7 @@ describe('file-validator', () => {
       expect(res.byteSize).toBe(validPdf.length);
       expect(res.originalFileName).not.toContain('/');
       expect(res.originalFileName).not.toContain('\\');
+      expect(res.contentHash).toMatch(/^[a-f0-9]{64}$/);
     });
   });
 });
