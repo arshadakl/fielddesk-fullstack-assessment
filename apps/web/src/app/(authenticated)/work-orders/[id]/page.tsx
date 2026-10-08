@@ -3,15 +3,24 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, Play, User as UserIcon, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, MessageSquare, Play, User as UserIcon, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/modules/auth/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUpdateWorkOrderStatus, useWorkOrder } from '@/modules/work-orders/_hooks/use-work-orders';
+import {
+  useUpdateWorkOrderStatus,
+  useWorkOrder,
+  useWorkOrderEvents,
+} from '@/modules/work-orders/_hooks/use-work-orders';
 import { PriorityBadge, StatusBadge } from '@/modules/work-orders/_components/badges';
 import { formatScheduleWindow } from '@/modules/work-orders/_utils/schedule-formatter';
 import { AssignTechnicianDialog } from '../_components/assign-technician-dialog';
+import { ActivityTimeline } from '@/modules/work-orders/_components/activity-timeline';
+import {
+  SubmitProgressDialog,
+  type ProgressDialogConfig,
+} from '@/modules/work-orders/_components/submit-progress-dialog';
 
 export default function WorkOrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -20,7 +29,10 @@ export default function WorkOrderDetailPage() {
   const user = session.data;
 
   const [assignOpen, setAssignOpen] = React.useState(false);
+  const [progressConfig, setProgressConfig] = React.useState<ProgressDialogConfig | null>(null);
+
   const { data: order, isLoading } = useWorkOrder(params.id);
+  const { data: events, isLoading: eventsLoading } = useWorkOrderEvents(params.id);
   const updateStatusMutation = useUpdateWorkOrderStatus();
 
   if (isLoading) {
@@ -63,19 +75,19 @@ export default function WorkOrderDetailPage() {
   const isTechnician = user?.role === 'TECHNICIAN';
   const isAssignedToMe = isTechnician && order.assignedTechnicianId === user?.id;
 
-  async function handleStatusChange(newStatus: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') {
+  async function handleDirectCancel() {
     if (!order) return;
     try {
       await updateStatusMutation.mutateAsync({
         id: order.id,
-        input: { status: newStatus },
+        input: { status: 'CANCELLED' },
       });
-      toast.success(`Work order status updated to ${newStatus.toLowerCase().replace('_', ' ')}`);
+      toast.success('Work order cancelled');
     } catch (error: unknown) {
       const message =
         error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
           ? error.message
-          : 'Failed to update status';
+          : 'Failed to cancel work order';
       toast.error(message);
     }
   }
@@ -98,7 +110,7 @@ export default function WorkOrderDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Dispatcher/Owner Actions */}
+          {/* Dispatcher/Owner Assignment */}
           {!isTechnician && order.status !== 'COMPLETED' && order.status !== 'IN_PROGRESS' && (
             <Button variant="outline" onClick={() => setAssignOpen(true)}>
               <Calendar className="size-4" />
@@ -106,35 +118,65 @@ export default function WorkOrderDetailPage() {
             </Button>
           )}
 
-          {/* Technician Progress Workflow */}
+          {/* Progress Note Action (Available to assigned technician or dispatcher/owner) */}
+          {(isAssignedToMe || !isTechnician) && order.status !== 'CANCELLED' && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                setProgressConfig({
+                  type: 'NOTE_ADDED',
+                  title: 'Add Progress Note',
+                  description: 'Record an observation, site note, or progress update for this job.',
+                })
+              }
+            >
+              <MessageSquare className="size-4" />
+              Add Note
+            </Button>
+          )}
+
+          {/* Technician: Start Work */}
           {isAssignedToMe && order.status === 'SCHEDULED' && (
             <Button
               className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => handleStatusChange('IN_PROGRESS')}
-              disabled={updateStatusMutation.isPending}
+              onClick={() =>
+                setProgressConfig({
+                  type: 'WORK_STARTED',
+                  targetStatus: 'IN_PROGRESS',
+                  title: 'Start Work Order',
+                  description: 'Transition status to In Progress and record commencement details.',
+                })
+              }
             >
               <Play className="size-4" />
               Start Work
             </Button>
           )}
 
+          {/* Technician: Complete Work */}
           {isAssignedToMe && order.status === 'IN_PROGRESS' && (
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => handleStatusChange('COMPLETED')}
-              disabled={updateStatusMutation.isPending}
+              onClick={() =>
+                setProgressConfig({
+                  type: 'WORK_COMPLETED',
+                  targetStatus: 'COMPLETED',
+                  title: 'Mark as Completed',
+                  description: 'Confirm that this job is finished and record any final resolution notes.',
+                })
+              }
             >
               <CheckCircle2 className="size-4" />
-              Complete Work
+              Mark as Completed
             </Button>
           )}
 
-          {/* Cancellation */}
+          {/* Dispatcher / Owner: Cancel Job */}
           {!isTechnician && order.status !== 'COMPLETED' && order.status !== 'CANCELLED' && (
             <Button
               variant="outline"
               className="text-destructive hover:bg-destructive/10"
-              onClick={() => handleStatusChange('CANCELLED')}
+              onClick={handleDirectCancel}
               disabled={updateStatusMutation.isPending}
             >
               <XCircle className="size-4" />
@@ -144,8 +186,8 @@ export default function WorkOrderDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="space-y-6 md:col-span-2">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           <section className="rounded-xl border border-border bg-card p-6">
             <h2 className="text-base font-semibold">Description & Scope</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground/90">
@@ -171,6 +213,36 @@ export default function WorkOrderDetailPage() {
                 </div>
               </div>
             </dl>
+          </section>
+
+          {/* Activity History & Audit Trail */}
+          <section className="rounded-xl border border-border bg-card p-6">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-base font-semibold">Activity & Audit History</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Immutable chronological audit log of all events and transitions.
+                </p>
+              </div>
+              {(isAssignedToMe || !isTechnician) && order.status !== 'CANCELLED' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setProgressConfig({
+                      type: 'NOTE_ADDED',
+                      title: 'Add Progress Note',
+                      description: 'Record an observation or field update.',
+                    })
+                  }
+                >
+                  <MessageSquare className="size-3.5" />
+                  Add Note
+                </Button>
+              )}
+            </div>
+
+            <ActivityTimeline events={events} isLoading={eventsLoading} />
           </section>
         </div>
 
@@ -230,6 +302,14 @@ export default function WorkOrderDetailPage() {
         workOrder={assignOpen ? order : null}
         onClose={() => setAssignOpen(false)}
       />
+
+      {progressConfig && (
+        <SubmitProgressDialog
+          workOrderId={order.id}
+          config={progressConfig}
+          onClose={() => setProgressConfig(null)}
+        />
+      )}
     </div>
   );
 }
