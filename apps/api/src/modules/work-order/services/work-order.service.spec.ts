@@ -7,6 +7,7 @@ import {
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 
+import { PrismaService } from '../../../database/prisma.service';
 import { UserService } from '../../user/services/user.service';
 import { WORK_ORDER_EVENT_REPOSITORY } from '../interfaces/work-order-event.interface';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
@@ -28,6 +29,7 @@ describe('WorkOrderService', () => {
   let recordEventWithWorkOrderLockMock: jest.Mock;
 
   let getUserByIdMock: jest.Mock;
+  let enqueueInTransactionMock: jest.Mock;
 
   let workOrderRepo: WorkOrderRepositoryPort;
   let eventRepo: unknown;
@@ -69,6 +71,7 @@ describe('WorkOrderService', () => {
     recordEventWithWorkOrderLockMock = jest.fn();
 
     getUserByIdMock = jest.fn();
+    enqueueInTransactionMock = jest.fn().mockResolvedValue(undefined);
 
     workOrderRepo = {
       findById: findWorkOrderByIdMock,
@@ -90,12 +93,28 @@ describe('WorkOrderService', () => {
       getById: getUserByIdMock,
     };
 
+    const mockPrisma = {
+      client: {
+        $transaction: jest.fn().mockImplementation((cb: (tx: unknown) => Promise<unknown>) => cb({})),
+      },
+    };
+
+    const mockNotificationRepo = {
+      enqueueInTransaction: enqueueInTransactionMock,
+      fetchAndLockBatch: jest.fn().mockResolvedValue([]),
+      markDelivered: jest.fn().mockResolvedValue(undefined),
+      markTransientFailure: jest.fn().mockResolvedValue(undefined),
+      markPermanentFailure: jest.fn().mockResolvedValue(undefined),
+    };
+
     module = await Test.createTestingModule({
       providers: [
         WorkOrderService,
         { provide: WORK_ORDER_REPOSITORY, useValue: workOrderRepo },
         { provide: WORK_ORDER_EVENT_REPOSITORY, useValue: eventRepo },
         { provide: UserService, useValue: userService },
+        { provide: 'NotificationRepositoryPort', useValue: mockNotificationRepo },
+        { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();
 
@@ -272,6 +291,49 @@ describe('WorkOrderService', () => {
           scheduledEnd: futureEnd,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('enqueues outbox notification atomically inside transaction on successful assignment', async () => {
+      findWorkOrderByIdMock.mockResolvedValue(mockWorkOrder);
+      getUserByIdMock.mockResolvedValue({
+        id: 'tech-1',
+        name: 'Rahul Sharma',
+        role: 'TECHNICIAN',
+        organisationId: tenant.organisationId,
+      });
+
+      const start = new Date(Date.now() + 60 * 60 * 1000);
+      const end = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      const updatedMock = {
+        ...mockWorkOrder,
+        assignedTechnicianId: 'tech-1',
+        scheduledStart: start,
+        scheduledEnd: end,
+        status: 'SCHEDULED' as const,
+      };
+      updateAssignmentMock.mockResolvedValue(updatedMock);
+
+      const result = await service.assign(tenant, 'wo-1', {
+        assignedTechnicianId: 'tech-1',
+        scheduledStart: start,
+        scheduledEnd: end,
+      });
+
+      expect(result).toEqual(updatedMock);
+      expect(updateAssignmentMock).toHaveBeenCalled();
+      expect(enqueueInTransactionMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          organisationId: tenant.organisationId,
+          workOrderId: 'wo-1',
+          recipientId: 'tech-1',
+          channel: 'SMS',
+          payload: expect.objectContaining({
+            technicianName: 'Rahul Sharma',
+            title: mockWorkOrder.title,
+          }) as unknown,
+        }),
+      );
     });
   });
 
