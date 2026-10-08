@@ -9,9 +9,10 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  contentClassName?: string;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, contentClassName }: DialogProps) {
   React.useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && open) {
@@ -22,6 +23,17 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onOpenChange]);
 
+  React.useEffect(() => {
+    if (!open) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -31,11 +43,16 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
-      <div className="relative z-50 w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl animate-in zoom-in-95 duration-150">
+      <div
+        className={cn(
+          'relative z-50 w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl animate-in zoom-in-95 duration-150',
+          contentClassName,
+        )}
+      >
         <Button
           variant="ghost"
           size="icon"
-          className="absolute right-4 top-4 size-8 text-muted-foreground hover:text-foreground"
+          className="absolute right-4 top-4 size-8 text-muted-foreground hover:text-foreground z-10"
           onClick={() => onOpenChange(false)}
           aria-label="Close"
         >
