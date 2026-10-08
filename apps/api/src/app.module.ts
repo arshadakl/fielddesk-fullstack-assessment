@@ -9,6 +9,7 @@ import { validateEnvironment } from './config/environment';
 import { DatabaseModule } from './database/database.module';
 import { AuthGuard } from './http/guards/auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { UserModule } from './modules/user/user.module';
 import { WorkOrderModule } from './modules/work-order/work-order.module';
 import { AuthRoutesModule } from './routes/auth/auth-routes.module';
@@ -31,6 +32,7 @@ import { WorkOrdersRoutesModule } from './routes/work-orders/work-orders-routes.
     AuthModule,
     UserModule,
     WorkOrderModule,
+    NotificationModule,
     AuthRoutesModule,
     UsersRoutesModule,
     OrganisationRoutesModule,
