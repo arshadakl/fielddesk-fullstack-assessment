@@ -13,3 +13,6 @@ export type WorkOrderStatus = components['schemas']['WorkOrderResDto']['status']
 export type WorkOrderEventResDto = components['schemas']['WorkOrderEventResDto'];
 export type SubmitProgressEventDto = components['schemas']['SubmitProgressEventDto'];
 export type WorkOrderEventType = components['schemas']['WorkOrderEventResDto']['type'];
+
+export type AttachmentResDto = components['schemas']['AttachmentResDto'];
+export type StorageUsageResDto = components['schemas']['StorageUsageResDto'];

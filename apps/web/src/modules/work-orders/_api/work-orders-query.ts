@@ -52,3 +52,29 @@ export async function getWorkOrderEvents(
   }
   return data;
 }
+
+export async function getWorkOrderAttachments(
+  id: string,
+  signal?: AbortSignal,
+): Promise<import('./api.types').AttachmentResDto[]> {
+  const { data, error } = await apiClient().GET('/api/v1/work-orders/{id}/attachments', {
+    params: { path: { id } },
+    signal,
+  });
+  if (error || !data) {
+    throw error || new Error('Failed to load work order attachments');
+  }
+  return data;
+}
+
+export async function getOrganisationStorageUsage(
+  signal?: AbortSignal,
+): Promise<import('./api.types').StorageUsageResDto> {
+  const { data, error } = await apiClient().GET('/api/v1/organisation/storage-usage', {
+    signal,
+  });
+  if (error || !data) {
+    throw error || new Error('Failed to load storage quota usage');
+  }
+  return data;
+}

@@ -12,11 +12,19 @@ import type {
 import {
   assignWorkOrder,
   createWorkOrder,
+  deleteAttachment,
   submitProgressEvent,
   updateWorkOrder,
   updateWorkOrderStatus,
+  uploadAttachment,
 } from '../_api/work-orders-mutations';
-import { getWorkOrderById, getWorkOrderEvents, getWorkOrders } from '../_api/work-orders-query';
+import {
+  getOrganisationStorageUsage,
+  getWorkOrderAttachments,
+  getWorkOrderById,
+  getWorkOrderEvents,
+  getWorkOrders,
+} from '../_api/work-orders-query';
 import { workOrdersKeys, type WorkOrdersListParams } from '../_api/work-orders-keys';
 
 export function useWorkOrders(params: WorkOrdersListParams) {
@@ -134,3 +142,74 @@ export function useSubmitProgressEvent() {
     },
   });
 }
+
+export function useWorkOrderAttachments(workOrderId: string) {
+  const { session } = useSession();
+  const orgId = session.data?.organisation.id ?? '';
+
+  return useQuery({
+    queryKey: workOrdersKeys.attachments(orgId, workOrderId),
+    queryFn: ({ signal }) => getWorkOrderAttachments(workOrderId, signal),
+    enabled: Boolean(orgId && workOrderId),
+  });
+}
+
+export function useStorageUsage() {
+  const { session } = useSession();
+  const orgId = session.data?.organisation.id ?? '';
+
+  return useQuery({
+    queryKey: workOrdersKeys.storageUsage(orgId),
+    queryFn: ({ signal }) => getOrganisationStorageUsage(signal),
+    enabled: Boolean(orgId),
+  });
+}
+
+export function useUploadAttachment() {
+  const { session } = useSession();
+  const orgId = session.data?.organisation.id ?? '';
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      workOrderId,
+      file,
+    }: {
+      workOrderId: string;
+      file: File;
+    }) => uploadAttachment(workOrderId, file),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.attachments(orgId, variables.workOrderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.storageUsage(orgId),
+      });
+    },
+  });
+}
+
+export function useDeleteAttachment() {
+  const { session } = useSession();
+  const orgId = session.data?.organisation.id ?? '';
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      workOrderId,
+      attachmentId,
+    }: {
+      workOrderId: string;
+      attachmentId: string;
+    }) => deleteAttachment(workOrderId, attachmentId),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.attachments(orgId, variables.workOrderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrdersKeys.storageUsage(orgId),
+      });
+    },
+  });
+}
+

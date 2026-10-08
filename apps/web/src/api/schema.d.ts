@@ -152,6 +152,23 @@ export interface paths {
         patch: operations["OrganisationController_update"];
         trace?: never;
     };
+    "/api/v1/organisation/storage-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get current organisation storage usage and quota */
+        get: operations["OrganisationController_getStorageUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/work-orders": {
         parameters: {
             query?: never;
@@ -235,6 +252,42 @@ export interface paths {
         /** Submit an immutable progress event with idempotent deduplication */
         post: operations["WorkOrdersController_submitEvent"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/work-orders/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List attachments for a work order */
+        get: operations["WorkOrdersController_listAttachments"];
+        put?: never;
+        /** Upload an attachment to a work order */
+        post: operations["WorkOrdersController_uploadAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/work-orders/{id}/attachments/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download or view a work order attachment */
+        get: operations["WorkOrdersController_downloadAttachment"];
+        put?: never;
+        post?: never;
+        /** Delete a work order attachment */
+        delete: operations["WorkOrdersController_deleteAttachment"];
         options?: never;
         head?: never;
         patch?: never;
@@ -344,6 +397,28 @@ export interface components {
              * @enum {string}
              */
             role: "OWNER" | "DISPATCHER" | "TECHNICIAN";
+        };
+        StorageUsageResDto: {
+            /**
+             * @description Storage quota limit in bytes
+             * @example 52428800
+             */
+            quotaBytes: number;
+            /**
+             * @description Total used storage in bytes
+             * @example 1048576
+             */
+            usedBytes: number;
+            /**
+             * @description Remaining storage quota in bytes
+             * @example 51380224
+             */
+            remainingBytes: number;
+            /**
+             * @description Percentage of storage quota consumed (0-100)
+             * @example 2
+             */
+            percentageUsed: number;
         };
         UpdateOrganisationDto: {
             /** @example Clearbrook Maintenance Ltd */
@@ -498,6 +573,20 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             user: components["schemas"]["WorkOrderEventUserDto"];
+        };
+        AttachmentResDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            workOrderId: string;
+            /** Format: uuid */
+            uploaderId: string;
+            uploaderName: string;
+            originalFileName: string;
+            mimeType: string;
+            byteSize: number;
+            /** Format: date-time */
+            createdAt: string;
         };
     };
     responses: never;
@@ -783,6 +872,25 @@ export interface operations {
             };
         };
     };
+    OrganisationController_getStorageUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageUsageResDto"];
+                };
+            };
+        };
+    };
     WorkOrdersController_list: {
         parameters: {
             query?: {
@@ -974,6 +1082,96 @@ export interface operations {
             };
             /** @description Conflict on invalid status transition or duplicate event ID mismatch */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkOrdersController_listAttachments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentResDto"][];
+                };
+            };
+        };
+    };
+    WorkOrdersController_uploadAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentResDto"];
+                };
+            };
+        };
+    };
+    WorkOrdersController_downloadAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                attachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkOrdersController_deleteAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                attachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attachment deleted successfully */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

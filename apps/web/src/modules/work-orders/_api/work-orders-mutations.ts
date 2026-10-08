@@ -1,3 +1,4 @@
+import { getApiUrl } from '@/lib/env';
 import { apiClient } from '@/api/client';
 import { assertAuthEpoch, authEpoch, getCsrf } from '@/modules/auth/api/auth-transport';
 import type {
@@ -85,4 +86,59 @@ export async function submitProgressEvent(
     throw error || new Error('Failed to submit progress event');
   }
   return data;
+}
+
+export async function uploadAttachment(
+  id: string,
+  file: File,
+): Promise<import('./api.types').AttachmentResDto> {
+  const expected = authEpoch();
+  const csrf = await getCsrf();
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${getApiUrl()}/api/v1/work-orders/${id}/attachments`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'X-CSRF-Token': csrf,
+    },
+    credentials: 'include',
+  });
+
+  assertAuthEpoch(expected);
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to upload attachment';
+    try {
+      const errJson = await response.json();
+      if (errJson && typeof errJson.message === 'string') {
+        errorMessage = errJson.message;
+      }
+    } catch {
+      // Use status text if json fails
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export async function deleteAttachment(
+  workOrderId: string,
+  attachmentId: string,
+): Promise<void> {
+  const expected = authEpoch();
+  const csrf = await getCsrf();
+  const { error } = await apiClient().DELETE(
+    '/api/v1/work-orders/{id}/attachments/{attachmentId}',
+    {
+      params: { path: { id: workOrderId, attachmentId } },
+      headers: { 'X-CSRF-Token': csrf },
+    },
+  );
+  assertAuthEpoch(expected);
+  if (error) {
+    throw error || new Error('Failed to delete attachment');
+  }
 }
