@@ -16,5 +16,6 @@ export type {
   Session,
   WorkOrder,
   WorkOrderEvent,
+  Attachment,
 } from './generated/prisma/client';
 export { normalizeEmail } from './email';

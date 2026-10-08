@@ -31,31 +31,34 @@ enum WorkOrderStatus {
 }
 
 model Organisation {
-  id         String      @id @default(uuid()) @db.Uuid
-  slug       String      @unique
-  name       String
-  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
-  users      User[]
-  workOrders WorkOrder[]
-  events     WorkOrderEvent[]
+  id                String           @id @default(uuid()) @db.Uuid
+  slug              String           @unique
+  name              String
+  storageQuotaBytes BigInt           @default(52428800) // Default 50 MB (50 * 1024 * 1024)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
+  users             User[]
+  workOrders        WorkOrder[]
+  events            WorkOrderEvent[]
+  attachments       Attachment[]
 }
 
 model User {
-  id                  String       @id @default(uuid()) @db.Uuid
-  organisationId      String       @db.Uuid
-  organisation        Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
-  email               String       @unique
+  id                  String           @id @default(uuid()) @db.Uuid
+  organisationId      String           @db.Uuid
+  organisation        Organisation     @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  email               String           @unique
   name                String
   passwordHash        String
   role                UserRole
-  createdAt           DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime     @updatedAt @db.Timestamptz(3)
-  authVersion         Int          @default(0)
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime         @updatedAt @db.Timestamptz(3)
+  authVersion         Int              @default(0)
   sessions            Session[]
-  createdWorkOrders   WorkOrder[]  @relation("WorkOrderCreator")
-  assignedWorkOrders  WorkOrder[]  @relation("WorkOrderAssignedTechnician")
+  createdWorkOrders   WorkOrder[]      @relation("WorkOrderCreator")
+  assignedWorkOrders  WorkOrder[]      @relation("WorkOrderAssignedTechnician")
   workOrderEvents     WorkOrderEvent[]
+  uploadedAttachments Attachment[]
 
   @@unique([organisationId, id])
   @@index([organisationId])
@@ -95,6 +98,7 @@ model WorkOrder {
   createdAt            DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
   events               WorkOrderEvent[]
+  attachments          Attachment[]
 
   @@unique([organisationId, id])
   @@unique([organisationId, reference])
@@ -126,4 +130,22 @@ model WorkOrderEvent {
 
   @@unique([organisationId, eventId])
   @@index([organisationId, workOrderId, createdAt(sort: Desc)])
+}
+
+model Attachment {
+  id               String       @id @default(uuid()) @db.Uuid
+  organisationId   String       @db.Uuid
+  organisation     Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  workOrderId      String       @db.Uuid
+  workOrder        WorkOrder    @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  uploaderId       String       @db.Uuid
+  uploader         User         @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
+  storageKey       String
+  originalFileName String
+  mimeType         String
+  byteSize         Int
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([organisationId, workOrderId, createdAt(sort: Desc)])
+  @@index([organisationId, createdAt])
 }
