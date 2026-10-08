@@ -7,6 +7,7 @@ import type {
   AttachmentRepositoryPort,
   AttachmentSummary,
 } from '../interfaces/attachment.interface';
+import type { RealtimeService } from '../../realtime/services/realtime.service';
 import { AttachmentService } from './attachment.service';
 
 describe('AttachmentService', () => {
@@ -100,10 +101,16 @@ describe('AttachmentService', () => {
       exists: existsFileMock,
     };
 
+    const mockRealtime = {
+      broadcastToOrganisation: jest.fn().mockResolvedValue(undefined),
+      createEventStream: jest.fn(),
+    };
+
     service = new AttachmentService(
       mockAttachmentRepo,
       mockWorkOrderRepo,
       mockStorageDriver,
+      mockRealtime as unknown as RealtimeService,
     );
   });
 

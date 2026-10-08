@@ -13,6 +13,7 @@ import {
   STORAGE_DRIVER,
   type StorageDriverPort,
 } from '../../../infrastructure/storage/storage-driver.port';
+import { RealtimeService } from '../../realtime/services/realtime.service';
 import { WORK_ORDER_REPOSITORY } from '../../work-order/interfaces/work-order-repository.interface';
 import type { WorkOrderRepositoryPort } from '../../work-order/interfaces/work-order-repository.interface';
 import {
@@ -46,6 +47,7 @@ export class AttachmentService {
     private readonly workOrderRepository: WorkOrderRepositoryPort,
     @Inject(STORAGE_DRIVER)
     private readonly storageDriver: StorageDriverPort,
+    private readonly realtime: RealtimeService,
   ) {}
 
   private async assertWorkOrderAccess(
@@ -153,6 +155,12 @@ export class AttachmentService {
         contentHash,
       });
 
+      void this.realtime.broadcastToOrganisation(context.organisationId, {
+        type: 'ATTACHMENT_ADDED',
+        workOrderId: input.workOrderId,
+        data: record,
+      });
+
       return record;
     } catch (err: unknown) {
       if (isNewPhysicalFile) {
@@ -257,6 +265,12 @@ export class AttachmentService {
       if (remainingReferences === 0) {
         await this.storageDriver.delete(deleted.storageKey);
       }
+
+      void this.realtime.broadcastToOrganisation(context.organisationId, {
+        type: 'ATTACHMENT_DELETED',
+        workOrderId,
+        data: { attachmentId },
+      });
     }
   }
 
