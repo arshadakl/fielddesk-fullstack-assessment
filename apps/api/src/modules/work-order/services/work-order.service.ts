@@ -202,7 +202,6 @@ export class WorkOrderService {
     }
 
     if (input.assignedTechnicianId) {
-      await this.validateTechnician(context, input.assignedTechnicianId);
       if (!input.scheduledStart || !input.scheduledEnd) {
         throw new BadRequestException(
           'Scheduled start and end time are required when assigning a technician',
@@ -210,13 +209,56 @@ export class WorkOrderService {
       }
     }
 
-    const created = await this.repository.create(context.organisationId, {
-      ...input,
-      title: input.title.trim(),
-      description: input.description.trim(),
-      siteName: input.siteName.trim(),
-      creatorId,
-    });
+    let created: WorkOrderSummary;
+
+    if (input.assignedTechnicianId && input.scheduledStart && input.scheduledEnd) {
+      const technician = await this.validateTechnician(context, input.assignedTechnicianId);
+
+      created = await this.prisma.client.$transaction(async (tx) => {
+        const wo = await this.repository.create(
+          context.organisationId,
+          {
+            ...input,
+            title: input.title.trim(),
+            description: input.description.trim(),
+            siteName: input.siteName.trim(),
+            creatorId,
+          },
+          tx,
+        );
+
+        const idempotencyKey = `assign_${wo.id}_${input.assignedTechnicianId}_${input.scheduledStart!.getTime()}`;
+
+        await this.notificationRepository.enqueueInTransaction(tx, {
+          organisationId: context.organisationId,
+          workOrderId: wo.id,
+          recipientId: input.assignedTechnicianId!,
+          channel: 'SMS',
+          idempotencyKey,
+          payload: {
+            workOrderId: wo.id,
+            reference: wo.reference,
+            title: wo.title,
+            siteName: wo.siteName,
+            technicianId: technician.id,
+            technicianName: technician.name,
+            scheduledStart: input.scheduledStart!.toISOString(),
+            scheduledEnd: input.scheduledEnd!.toISOString(),
+            assignedByUserId: creatorId,
+          },
+        });
+
+        return wo;
+      });
+    } else {
+      created = await this.repository.create(context.organisationId, {
+        ...input,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        siteName: input.siteName.trim(),
+        creatorId,
+      });
+    }
 
     void this.realtime.broadcastToOrganisation(context.organisationId, {
       type: 'WORK_ORDER_CREATED',
@@ -511,6 +553,18 @@ export class WorkOrderService {
           'Event ID already processed for another work order',
         );
       }
+
+      // Check technician authorization before returning cached event to prevent unauthorized information leak
+      if (userRole === 'TECHNICIAN') {
+        const workOrder = await this.repository.findById(
+          context.organisationId,
+          workOrderId,
+        );
+        if (!workOrder || workOrder.assignedTechnicianId !== userId) {
+          throw new NotFoundException('Resource not found');
+        }
+      }
+
       return existingEvent;
     }
 

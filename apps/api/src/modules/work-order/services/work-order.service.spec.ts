@@ -289,6 +289,58 @@ describe('WorkOrderService', () => {
       expect(createWorkOrderMock).toHaveBeenCalled();
     });
 
+    it('enqueues outbox notification atomically when work order is created with assigned technician', async () => {
+      getUserByIdMock.mockResolvedValue({
+        id: 'tech-1',
+        name: 'Rahul Sharma',
+        role: 'TECHNICIAN',
+        organisationId: tenant.organisationId,
+      });
+
+      const start = new Date(Date.now() + 60 * 60 * 1000);
+      const end = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      const createdWithTech = {
+        ...mockWorkOrder,
+        id: 'wo-new-1',
+        assignedTechnicianId: 'tech-1',
+        scheduledStart: start,
+        scheduledEnd: end,
+        status: 'SCHEDULED' as const,
+      };
+      createWorkOrderMock.mockResolvedValue(createdWithTech);
+
+      const result = await service.create(tenant, 'creator-1', {
+        title: 'New AC Order',
+        description: 'New Description',
+        siteName: 'Site B',
+        assignedTechnicianId: 'tech-1',
+        scheduledStart: start,
+        scheduledEnd: end,
+      });
+
+      expect(result).toEqual(createdWithTech);
+      expect(createWorkOrderMock).toHaveBeenCalledWith(
+        tenant.organisationId,
+        expect.objectContaining({
+          assignedTechnicianId: 'tech-1',
+        }),
+        expect.anything(),
+      );
+      expect(enqueueInTransactionMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          organisationId: tenant.organisationId,
+          workOrderId: 'wo-new-1',
+          recipientId: 'tech-1',
+          channel: 'SMS',
+          payload: expect.objectContaining({
+            technicianName: 'Rahul Sharma',
+            title: createdWithTech.title,
+          }) as unknown,
+        }),
+      );
+    });
+
     it('rejects create when scheduled start is in the past', async () => {
       const pastStart = new Date(Date.now() - 24 * 60 * 60 * 1000); // 1 day ago
       const pastEnd = new Date(Date.now() - 23 * 60 * 60 * 1000);
@@ -508,6 +560,11 @@ describe('WorkOrderService', () => {
         createdAt: new Date('2026-08-04T10:30:01Z'),
       };
       findByEventIdMock.mockResolvedValue(existingSummary);
+      findWorkOrderByIdMock.mockResolvedValue({
+        ...mockWorkOrder,
+        id: 'wo-1',
+        assignedTechnicianId: 'tech-1',
+      });
 
       const result = await service.submitProgressEvent(
         tenant,
@@ -519,6 +576,38 @@ describe('WorkOrderService', () => {
 
       expect(result).toEqual(existingSummary);
       expect(recordEventWithWorkOrderLockMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects technician replaying duplicate event on work order not assigned to them', async () => {
+      const existingSummary = {
+        id: 'evt-existing-uuid',
+        eventId: 'evt-10001',
+        organisationId: tenant.organisationId,
+        workOrderId: 'wo-1',
+        userId: 'tech-original',
+        userName: 'Rahul',
+        userRole: 'TECHNICIAN',
+        type: 'STATUS_CHANGED' as const,
+        occurredAt: new Date('2026-08-04T10:30:00Z'),
+        payload: { status: 'in_progress', note: 'Technician on site' },
+        createdAt: new Date('2026-08-04T10:30:01Z'),
+      };
+      findByEventIdMock.mockResolvedValue(existingSummary);
+      findWorkOrderByIdMock.mockResolvedValue({
+        ...mockWorkOrder,
+        id: 'wo-1',
+        assignedTechnicianId: 'tech-other',
+      });
+
+      await expect(
+        service.submitProgressEvent(
+          tenant,
+          'wo-1',
+          sampleEventInput,
+          'TECHNICIAN',
+          'tech-attacker',
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('rejects duplicate eventId when associated with a different work order', async () => {

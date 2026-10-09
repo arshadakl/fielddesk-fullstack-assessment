@@ -156,4 +156,30 @@ describe('NotificationService (Background Worker Engine)', () => {
       }),
     );
   });
+
+  it('moves to DEAD_LETTER when unexpected runtime exception occurs and maxAttempts reached', async () => {
+    const exhaustedRecord: OutboxRecord = {
+      ...sampleOutboxRecord,
+      attemptCount: 2, // Next attempt is 3
+    };
+
+    fetchAndLockBatchMock.mockResolvedValue([exhaustedRecord]);
+    mockProvider.send = jest.fn().mockRejectedValue(new Error('Fatal socket crash'));
+
+    const result = await service.processPendingOutboxBatch(10, 'worker-test');
+
+    expect(result.processedCount).toBe(1);
+    expect(result.deliveredCount).toBe(0);
+    expect(result.failedCount).toBe(0);
+    expect(result.deadLetterCount).toBe(1);
+
+    expect(markPermanentFailureMock).toHaveBeenCalledWith(
+      'outbox-1',
+      expect.stringContaining('Fatal socket crash'),
+      expect.objectContaining({
+        attemptNumber: 3,
+        status: 'TRANSIENT_FAILURE',
+      }),
+    );
+  });
 });

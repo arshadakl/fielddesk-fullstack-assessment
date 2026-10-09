@@ -157,6 +157,22 @@ export class NotificationService {
           ? unexpectedErr.message
           : 'Unexpected runtime exception during worker dispatch';
 
+      if (currentAttempt >= record.maxAttempts) {
+        const exhaustedMsg = `Max retry attempts (${record.maxAttempts}) reached. Unexpected crash: ${errorMsg}`;
+        await this.repository.markPermanentFailure(record.id, exhaustedMsg, {
+          outboxId: record.id,
+          attemptNumber: currentAttempt,
+          status: 'TRANSIENT_FAILURE',
+          errorDetails: exhaustedMsg,
+          latencyMs,
+        });
+
+        this.logger.error(
+          `[Worker] Outbox ${record.id} exhausted max retries (${record.maxAttempts}) on unexpected crash: ${errorMsg}. Moved to DEAD_LETTER.`,
+        );
+        return 'DEAD_LETTER';
+      }
+
       // Treat unexpected code exceptions as transient and back off
       const { nextAttemptAt } = calculateExponentialBackoff(currentAttempt);
       await this.repository.markTransientFailure(record.id, nextAttemptAt, errorMsg, {

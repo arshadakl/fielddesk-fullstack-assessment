@@ -197,34 +197,40 @@ export class WorkOrderRepository implements WorkOrderRepositoryPort {
   async create(
     organisationId: string,
     input: CreateWorkOrderEntityInput,
+    txClient?: unknown,
   ): Promise<WorkOrderSummary> {
-    try {
-      return await this.database.client.$transaction(async (tx) => {
-        await this.lockOrganisation(tx, organisationId);
+    const execute = async (tx: Prisma.TransactionClient): Promise<WorkOrderSummary> => {
+      await this.lockOrganisation(tx, organisationId);
 
-        const count = await tx.workOrder.count({
-          where: { organisationId },
-        });
-        const reference = `WO-${String(count + 1).padStart(4, '0')}`;
-
-        const record = await tx.workOrder.create({
-          data: {
-            organisationId,
-            reference,
-            title: input.title,
-            description: input.description,
-            priority: input.priority,
-            status: input.assignedTechnicianId ? 'SCHEDULED' : 'DRAFT',
-            siteName: input.siteName,
-            creatorId: input.creatorId,
-            assignedTechnicianId: input.assignedTechnicianId,
-            scheduledStart: input.scheduledStart,
-            scheduledEnd: input.scheduledEnd,
-          },
-          select: workOrderSelect,
-        });
-        return mapWorkOrder(record);
+      const count = await tx.workOrder.count({
+        where: { organisationId },
       });
+      const reference = `WO-${String(count + 1).padStart(4, '0')}`;
+
+      const record = await tx.workOrder.create({
+        data: {
+          organisationId,
+          reference,
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          status: input.assignedTechnicianId ? 'SCHEDULED' : 'DRAFT',
+          siteName: input.siteName,
+          creatorId: input.creatorId,
+          assignedTechnicianId: input.assignedTechnicianId,
+          scheduledStart: input.scheduledStart,
+          scheduledEnd: input.scheduledEnd,
+        },
+        select: workOrderSelect,
+      });
+      return mapWorkOrder(record);
+    };
+
+    try {
+      if (txClient) {
+        return await execute(txClient as Prisma.TransactionClient);
+      }
+      return await this.database.client.$transaction(execute);
     } catch (error: unknown) {
       this.handleDatabaseError(error);
       throw error;

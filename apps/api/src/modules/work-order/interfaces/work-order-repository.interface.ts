@@ -40,6 +40,7 @@ export interface WorkOrderRepositoryPort {
   create(
     organisationId: string,
     input: CreateWorkOrderEntityInput,
+    txClient?: unknown,
   ): Promise<WorkOrderSummary>;
 
   update(
