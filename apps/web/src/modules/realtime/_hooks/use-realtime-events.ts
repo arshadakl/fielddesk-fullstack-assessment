@@ -60,6 +60,11 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
           queryKey: ['work-orders'],
         });
 
+        // Invalidate notifications key so unread badges and dropdown sync instantly
+        void queryClient.invalidateQueries({
+          queryKey: ['notifications'],
+        });
+
         // Targeted invalidations for specific views
         if (payload.workOrderId) {
           void queryClient.invalidateQueries({
@@ -92,6 +97,15 @@ export function useRealtimeEvents(): { status: ConnectionStatus } {
                 reference: payload.reference,
                 assignedTechnicianId: payload.assignedTechnicianId,
               },
+            }),
+          );
+        }
+
+        // Emit general realtime event for in-app notification center
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('fielddesk-realtime-event', {
+              detail: payload,
             }),
           );
         }

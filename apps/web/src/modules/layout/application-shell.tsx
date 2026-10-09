@@ -11,6 +11,7 @@ import {
   RealtimeStatusBadge,
   useRealtimeEvents,
 } from '@/modules/realtime';
+import { NotificationBell } from '@/modules/notifications';
 
 export function ApplicationShell({ children }: { children: ReactNode }) {
   const { session } = useSession();
@@ -85,6 +86,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <RealtimeStatusBadge status={realtimeStatus} />
+            <NotificationBell />
             <ThemeSelector />
             <Button
               variant="outline"

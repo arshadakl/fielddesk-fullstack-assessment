@@ -187,6 +187,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/work-orders/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream organization work orders as sanitized CSV */
+        get: operations["WorkOrdersController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/work-orders/{id}": {
         parameters: {
             query?: never;
@@ -288,6 +305,74 @@ export interface paths {
         post?: never;
         /** Delete a work order attachment */
         delete: operations["WorkOrdersController_deleteAttachment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent notifications for the authenticated user */
+        get: operations["NotificationsController_list"];
+        put?: never;
+        post?: never;
+        /** Clear all notifications for the authenticated user */
+        delete: operations["NotificationsController_clearAll"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark a specific notification as read */
+        patch: operations["NotificationsController_markRead"];
+        trace?: never;
+    };
+    "/api/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark all notifications as read for current user */
+        patch: operations["NotificationsController_markAllRead"];
+        trace?: never;
+    };
+    "/api/v1/realtime/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RealtimeController_streamEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -587,6 +672,23 @@ export interface components {
             byteSize: number;
             /** Format: date-time */
             createdAt: string;
+        };
+        InAppNotificationItemDto: {
+            /** Format: uuid */
+            id: string;
+            type: string;
+            title: string;
+            description: string;
+            /** Format: uuid */
+            workOrderId?: Record<string, never> | null;
+            isRead: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        InAppNotificationListResDto: {
+            items: components["schemas"]["InAppNotificationItemDto"][];
+            /** @example 3 */
+            unreadCount: number;
         };
     };
     responses: never;
@@ -940,6 +1042,29 @@ export interface operations {
             };
         };
     };
+    WorkOrdersController_export: {
+        parameters: {
+            query?: {
+                status?: "DRAFT" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+                priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+                assignedTechnicianId?: string;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description RFC 4180 compliant CSV stream with formula injection sanitization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     WorkOrdersController_getById: {
         parameters: {
             query?: never;
@@ -1172,6 +1297,100 @@ export interface operations {
         responses: {
             /** @description Attachment deleted successfully */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_list: {
+        parameters: {
+            query?: {
+                limit?: number;
+                unreadOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotificationListResDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_clearAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotificationItemDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RealtimeController_streamEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
