@@ -33,7 +33,7 @@ export function NotificationBell() {
     }
   };
 
-  const handleNotificationClick = (workOrderId?: string, id?: string) => {
+  const handleNotificationClick = (workOrderId?: string | null, id?: string) => {
     if (id) {
       markAsRead(id);
     }
@@ -152,9 +152,9 @@ export function NotificationBell() {
                   <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
                     {item.description}
                   </p>
-                  {item.reference && (
+                  {Boolean('reference' in item && item.reference) && (
                     <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary">
-                      <span>{item.reference}</span>
+                      <span>{String((item as { reference?: string }).reference)}</span>
                       <ExternalLink className="size-2.5 opacity-60" aria-hidden="true" />
                     </div>
                   )}

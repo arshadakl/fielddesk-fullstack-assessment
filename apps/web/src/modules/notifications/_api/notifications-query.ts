@@ -20,7 +20,7 @@ export async function getNotifications(
     throw error || new Error('Failed to load notifications');
   }
 
-  return data;
+  return data as unknown as InAppNotificationListResDto;
 }
 
 export async function markNotificationAsRead(
@@ -39,7 +39,7 @@ export async function markNotificationAsRead(
     throw error || new Error('Failed to mark notification as read');
   }
 
-  return data;
+  return data as unknown as InAppNotificationItemDto;
 }
 
 export async function markAllNotificationsAsRead(): Promise<void> {

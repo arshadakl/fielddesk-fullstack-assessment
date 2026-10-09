@@ -1,10 +1,20 @@
-import type { components, operations } from '@/api/schema';
+export interface InAppNotificationItemDto {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  workOrderId?: string | null;
+  reference?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
 
-export type InAppNotificationItemDto =
-  components['schemas']['InAppNotificationItemDto'];
+export interface InAppNotificationListResDto {
+  items: InAppNotificationItemDto[];
+  unreadCount: number;
+}
 
-export type InAppNotificationListResDto =
-  components['schemas']['InAppNotificationListResDto'];
-
-export type ListNotificationsQueryParams =
-  operations['NotificationsController_list']['parameters']['query'];
+export interface ListNotificationsQueryParams {
+  limit?: number;
+  unreadOnly?: boolean;
+}

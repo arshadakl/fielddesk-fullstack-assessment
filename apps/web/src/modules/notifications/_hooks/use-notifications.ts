@@ -9,6 +9,10 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '../_api/notifications-query';
+import type {
+  InAppNotificationItemDto,
+  InAppNotificationListResDto,
+} from '../_api/api.types';
 
 export function useNotifications(limit = 25) {
   const { session } = useSession();
@@ -33,11 +37,13 @@ export function useNotifications(limit = 25) {
       const previous = queryClient.getQueryData<InAppNotificationListResDto>(queryKey);
 
       if (previous) {
-        const wasUnread = previous.items.some((item) => item.id === id && !item.isRead);
+        const wasUnread = previous.items.some(
+          (item: InAppNotificationItemDto) => item.id === id && !item.isRead,
+        );
         queryClient.setQueryData<InAppNotificationListResDto>(queryKey, {
           ...previous,
           unreadCount: wasUnread ? Math.max(0, previous.unreadCount - 1) : previous.unreadCount,
-          items: previous.items.map((item) =>
+          items: previous.items.map((item: InAppNotificationItemDto) =>
             item.id === id ? { ...item, isRead: true } : item,
           ),
         });
@@ -65,7 +71,10 @@ export function useNotifications(limit = 25) {
         queryClient.setQueryData<InAppNotificationListResDto>(queryKey, {
           ...previous,
           unreadCount: 0,
-          items: previous.items.map((item) => ({ ...item, isRead: true })),
+          items: previous.items.map((item: InAppNotificationItemDto) => ({
+            ...item,
+            isRead: true,
+          })),
         });
       }
 
