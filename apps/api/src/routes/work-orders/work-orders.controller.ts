@@ -182,11 +182,16 @@ export class WorkOrdersController {
     @Body() dto: AssignWorkOrderDto,
   ): Promise<WorkOrderResDto> {
     const context = { organisationId: identity.organisation.id };
-    const result = await this.workOrders.assign(context, id, {
-      assignedTechnicianId: dto.assignedTechnicianId,
-      scheduledStart: dto.scheduledStart,
-      scheduledEnd: dto.scheduledEnd,
-    });
+    const result = await this.workOrders.assign(
+      context,
+      id,
+      {
+        assignedTechnicianId: dto.assignedTechnicianId,
+        scheduledStart: dto.scheduledStart,
+        scheduledEnd: dto.scheduledEnd,
+      },
+      identity.id,
+    );
     return WorkOrderResDto.fromData(result);
   }
 

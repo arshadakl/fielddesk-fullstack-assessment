@@ -19,6 +19,7 @@ import { OrganisationRoutesModule } from './routes/organisation/organisation-rou
 import { RealtimeRoutesModule } from './routes/realtime/realtime-routes.module';
 import { UsersRoutesModule } from './routes/users/users-routes.module';
 import { WorkOrdersRoutesModule } from './routes/work-orders/work-orders-routes.module';
+import { NotificationsRoutesModule } from './routes/notifications/notifications-routes.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { WorkOrdersRoutesModule } from './routes/work-orders/work-orders-routes.
     UsersRoutesModule,
     OrganisationRoutesModule,
     WorkOrdersRoutesModule,
+    NotificationsRoutesModule,
     RealtimeRoutesModule,
     HealthRoutesModule,
   ],
