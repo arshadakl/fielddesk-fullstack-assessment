@@ -12,16 +12,19 @@ FieldDesk is a fictional field-service application created solely for this asses
 4. Complete the [technical notes](candidate-submission/TECHNICAL_NOTES.md) and [AI usage disclosure](candidate-submission/AI_USAGE.md).
 5. Raise questions or blockers through a GitHub Issue in this repository.
 
-## Current milestone: frontend foundation and authentication
+## Overview: Full-Stack Multi-Tenant FieldDesk Implementation
 
-The workspace contains a themed Next.js frontend and a NestJS API, plus PostgreSQL
-and Redis in Docker Compose. The shared Prisma package
-provides organisations, users, migrations, repeatable seeds and a NestJS database
-provider. The API now supports PostgreSQL cookie sessions, synchronizer CSRF
-protection, permission guards and Redis-backed login limits. The frontend supports
-email/password login, session loading, protected pages, logout and light/dark/system
-themes. Owner management, the worker and business features remain deferred.
-This is not the complete assessment implementation.
+FieldDesk is a multi-tenant maintenance operations platform built with Next.js 16, NestJS, PostgreSQL 17, and Redis 7.4.
+
+Key features implemented:
+- **Authentication & Tenant Isolation**: Secure session cookies, CSRF synchronizer token protection, Argon2id password hashing, and strict role-based access control (Owner, Dispatcher, Technician) with tenant-scoped database queries.
+- **Work-Order Management**: Full creation, editing, scheduling, priority management, search, filtering, and pagination.
+- **Scheduling & Concurrency**: PostgreSQL `btree_gist` exclusion constraints preventing overlapping technician schedules under concurrent requests.
+- **Progress-Event Audit Trail**: Immutable progress events with idempotent replays and pre-authorization validation.
+- **Transactional Outbox Worker**: Decoupled background notification processor with exponential backoff retries and dead-letter queue routing.
+- **Real-Time Reactivity**: Server-Sent Events (SSE) backed by tenant-isolated Redis Pub/Sub channels.
+- **Secure File Storage**: Magic-byte MIME sniffing, SHA-256 deduplication, and organisation storage quota enforcement.
+- **Reporting**: Organisation-scoped CSV exports with formula-injection neutralization.
 
 ### Local setup
 
@@ -69,8 +72,8 @@ Restart development or rebuild production after changing it. Use `localhost`
 consistently rather than mixing it with `127.0.0.1`, and allow the frontend origin
 in the API's `ALLOWED_ORIGINS`.
 
-Visit `/login` and use a seeded account. `/dashboard` displays the current user's
-name, role and organisation; work-order data and metrics are not implemented yet.
+Visit `/login` and use a seeded account (or click "Demo accounts" to auto-fill).
+`/dashboard` displays live work-order metrics, status breakdowns, and active work orders.
 The theme selector supports Light, Dark and System and remembers your preference.
 
 Run `pnpm codegen` after backend contract changes, with the API running at the
