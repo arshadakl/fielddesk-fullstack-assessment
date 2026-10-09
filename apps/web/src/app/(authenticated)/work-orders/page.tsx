@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Calendar, ChevronRight, Download, Loader2, Plus, Wrench } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Download, Loader2, Plus, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/modules/auth/hooks/use-session';
 import { Button } from '@/components/ui/button';
@@ -32,9 +32,23 @@ export default function WorkOrdersPage() {
   const statusParam = (searchParams.get('status') || '') as WorkOrderStatus | '';
   const priorityParam = (searchParams.get('priority') || '') as WorkOrderPriority | '';
   const searchParam = searchParams.get('search') || '';
-  const pageParam = Number(searchParams.get('page') || '1');
+  const pageParam = Math.max(1, Number(searchParams.get('page') || '1'));
+  const newParam = searchParams.get('new') === 'true';
 
-  const [createOpen, setCreateOpen] = React.useState(false);
+  const [createOpenManual, setCreateOpenManual] = React.useState(false);
+  const isCreateOpen = createOpenManual || newParam;
+
+  function handleCreateOpenChange(open: boolean) {
+    if (!open) {
+      setCreateOpenManual(false);
+      if (newParam) {
+        updateParams({ new: null });
+      }
+    } else {
+      setCreateOpenManual(true);
+    }
+  }
+
   const [assigningOrder, setAssigningOrder] = React.useState<WorkOrderResDto | null>(null);
   const [isExporting, setIsExporting] = React.useState(false);
 
@@ -105,7 +119,7 @@ export default function WorkOrdersPage() {
             <span>Export CSV</span>
           </Button>
           {!isTechnician && (
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={() => handleCreateOpenChange(true)}>
               <Plus className="size-4" />
               New Work Order
             </Button>
@@ -236,9 +250,57 @@ export default function WorkOrdersPage() {
             </TableBody>
           </Table>
         )}
+
+        {/* Pagination Controls */}
+        {data && data.total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-4 py-3 bg-card/50">
+            <p className="text-xs text-muted-foreground">
+              Showing{' '}
+              <span className="font-medium text-foreground">
+                {(pageParam - 1) * 20 + 1}
+              </span>{' '}
+              to{' '}
+              <span className="font-medium text-foreground">
+                {Math.min(pageParam * 20, data.total)}
+              </span>{' '}
+              of <span className="font-medium text-foreground">{data.total}</span> orders
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pageParam <= 1}
+                onClick={() =>
+                  updateParams({
+                    page: pageParam > 2 ? String(pageParam - 1) : null,
+                  })
+                }
+              >
+                <ChevronLeft className="size-3.5 mr-1" />
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground px-1">
+                Page {pageParam} of {Math.max(1, Math.ceil(data.total / 20))}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pageParam * 20 >= data.total}
+                onClick={() =>
+                  updateParams({
+                    page: String(pageParam + 1),
+                  })
+                }
+              >
+                Next
+                <ChevronRight className="size-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <CreateWorkOrderDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateWorkOrderDialog open={isCreateOpen} onOpenChange={handleCreateOpenChange} />
       <AssignTechnicianDialog
         workOrder={assigningOrder}
         onClose={() => setAssigningOrder(null)}

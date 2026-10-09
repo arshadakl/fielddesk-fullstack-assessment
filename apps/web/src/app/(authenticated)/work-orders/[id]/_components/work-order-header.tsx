@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, CheckCircle2, MessageSquare, Play, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, MessageSquare, Pencil, Play, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { PriorityBadge, StatusBadge } from '@/modules/work-orders/_components/badges';
@@ -10,6 +10,7 @@ interface WorkOrderHeaderProps {
   isTechnician: boolean;
   isAssignedToMe: boolean;
   isCancelPending: boolean;
+  onOpenEdit?: () => void;
   onOpenAssign: () => void;
   onOpenProgress: (config: ProgressDialogConfig) => void;
   onCancelJob: () => void;
@@ -20,6 +21,7 @@ export function WorkOrderHeader({
   isTechnician,
   isAssignedToMe,
   isCancelPending,
+  onOpenEdit,
   onOpenAssign,
   onOpenProgress,
   onCancelJob,
@@ -43,6 +45,14 @@ export function WorkOrderHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {/* Dispatcher/Owner Edit Work Order */}
+        {!isTechnician && order.status !== 'COMPLETED' && order.status !== 'CANCELLED' && onOpenEdit && (
+          <Button variant="outline" onClick={onOpenEdit}>
+            <Pencil className="size-4" />
+            Edit
+          </Button>
+        )}
+
         {/* Dispatcher/Owner Assignment */}
         {!isTechnician && order.status !== 'COMPLETED' && order.status !== 'IN_PROGRESS' && (
           <Button variant="outline" onClick={onOpenAssign}>

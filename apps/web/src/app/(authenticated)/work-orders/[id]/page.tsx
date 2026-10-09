@@ -13,6 +13,7 @@ import {
   useWorkOrderEvents,
 } from '@/modules/work-orders/_hooks/use-work-orders';
 import { AssignTechnicianDialog } from '../_components/assign-technician-dialog';
+import { EditWorkOrderDialog } from '../_components/edit-work-order-dialog';
 import { ActivityTimeline } from '@/modules/work-orders/_components/activity-timeline';
 import { AttachmentsPanel } from '@/modules/work-orders/_components/attachments-panel';
 import {
@@ -30,6 +31,7 @@ export default function WorkOrderDetailPage() {
   const { session } = useSession();
   const user = session.data;
 
+  const [editOpen, setEditOpen] = React.useState(false);
   const [assignOpen, setAssignOpen] = React.useState(false);
   const [progressConfig, setProgressConfig] = React.useState<ProgressDialogConfig | null>(null);
   const [reassignedState, setReassignedState] = React.useState<{
@@ -135,6 +137,7 @@ export default function WorkOrderDetailPage() {
         isTechnician={isTechnician}
         isAssignedToMe={isAssignedToMe}
         isCancelPending={updateStatusMutation.isPending}
+        onOpenEdit={() => setEditOpen(true)}
         onOpenAssign={() => setAssignOpen(true)}
         onOpenProgress={(cfg) => setProgressConfig(cfg)}
         onCancelJob={() => void handleDirectCancel()}
@@ -192,6 +195,12 @@ export default function WorkOrderDetailPage() {
           />
         </div>
       </div>
+
+      <EditWorkOrderDialog
+        workOrder={editOpen ? order : null}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
 
       <AssignTechnicianDialog
         workOrder={assignOpen ? order : null}

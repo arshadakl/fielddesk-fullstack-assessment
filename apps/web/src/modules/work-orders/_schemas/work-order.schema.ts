@@ -72,3 +72,12 @@ export const assignTechnicianSchema = z
   );
 
 export type AssignTechnicianFormValues = z.infer<typeof assignTechnicianSchema>;
+
+export const updateWorkOrderSchema = z.object({
+  title: z.string().trim().min(2, 'Title must be at least 2 characters').max(100),
+  description: z.string().trim().min(2, 'Description must be at least 2 characters').max(1000),
+  siteName: z.string().trim().min(2, 'Site name must be at least 2 characters').max(100),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
+});
+
+export type UpdateWorkOrderFormValues = z.infer<typeof updateWorkOrderSchema>;
