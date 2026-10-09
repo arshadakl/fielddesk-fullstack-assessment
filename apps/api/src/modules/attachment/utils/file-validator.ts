@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException } from '@nestjs/common';
+import 'multer';
 
 export const ALLOWED_MIME_TYPES = [
   'image/jpeg',

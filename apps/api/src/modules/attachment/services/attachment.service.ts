@@ -1,4 +1,5 @@
 import type { Readable } from 'node:stream';
+import 'multer';
 import {
   ForbiddenException,
   HttpException,

@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import 'multer';
 import {
   detectMimeTypeFromBuffer,
   validateUploadedFile,

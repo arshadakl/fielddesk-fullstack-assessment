@@ -1,4 +1,5 @@
 import { ForbiddenException, HttpStatus, NotFoundException } from '@nestjs/common';
+import 'multer';
 
 import type { StorageDriverPort } from '../../../infrastructure/storage/storage-driver.port';
 import type { WorkOrderRepositoryPort } from '../../work-order/interfaces/work-order-repository.interface';
