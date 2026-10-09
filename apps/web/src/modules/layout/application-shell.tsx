@@ -173,7 +173,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8 md:grid-cols-[200px_1fr]">
-        <aside>
+        <aside className="hidden md:block">
           <nav aria-label="Main navigation" className="space-y-1">
             {navItems.map((item) => {
               const isActive = item.exact
@@ -204,10 +204,48 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
             </p>
           </div>
         </aside>
-        <main id="main-content" className="min-w-0">
+        <main id="main-content" className="min-w-0 pb-20 md:pb-0">
           {children}
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation Snackbar / Tab bar */}
+      <nav
+        aria-label="Mobile navigation"
+        className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 pb-[env(safe-area-inset-bottom)] md:hidden shadow-lg"
+      >
+        <div className="flex h-16 items-center justify-around px-2">
+          {navItems.map((item) => {
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex flex-1 flex-col items-center justify-center gap-1 py-1 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'text-primary font-semibold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <div
+                  className={`flex size-8 items-center justify-center rounded-full transition-colors ${
+                    isActive ? 'bg-primary/10' : ''
+                  }`}
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                </div>
+                <span className="truncate max-w-[72px] text-[11px] leading-tight text-center">
+                  {item.label}
+                </span>
+              </NavLink>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
