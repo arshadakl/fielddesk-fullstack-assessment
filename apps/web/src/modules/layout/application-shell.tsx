@@ -1,22 +1,38 @@
 'use client';
 import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, LogOut, Settings, Users, Wrench, Briefcase } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Briefcase,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  MoreVertical,
+  Settings,
+  Sun,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { NavLink } from '@/components/navigation-progress';
 import { useSession } from '@/modules/auth/hooks/use-session';
-import { ThemeSelector } from '@/modules/theme/theme-selector';
 import { Button } from '@/components/ui/button';
 import { useLogout } from '@/modules/auth/hooks/use-logout';
-import {
-  RealtimeStatusBadge,
-  useRealtimeEvents,
-} from '@/modules/realtime';
+import { useRealtimeEvents } from '@/modules/realtime';
 import { NotificationBell } from '@/modules/notifications';
 
 export function ApplicationShell({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const logoutMutation = useLogout();
-  const { status: realtimeStatus } = useRealtimeEvents();
+  useRealtimeEvents();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const user = session.data;
@@ -85,19 +101,74 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <RealtimeStatusBadge status={realtimeStatus} />
             <NotificationBell />
-            <ThemeSelector />
-            <Button
-              variant="outline"
-              disabled={logoutMutation.isPending}
-              onClick={() => {
-                void signOut();
-              }}
-            >
-              <LogOut className="size-4" aria-hidden="true" />
-              {logoutMutation.isPending ? 'Signing out…' : 'Sign out'}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="User actions and preferences"
+                  className="size-9 rounded-md text-muted-foreground hover:text-foreground"
+                >
+                  <MoreVertical className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-1.5">
+                <DropdownMenuLabel className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Theme
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm"
+                  onSelect={() => setTheme('light')}
+                >
+                  <span className="flex items-center gap-2">
+                    <Sun className="size-4" aria-hidden="true" />
+                    Light
+                  </span>
+                  {theme === 'light' && (
+                    <span className="text-xs text-primary font-medium">Active</span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm"
+                  onSelect={() => setTheme('dark')}
+                >
+                  <span className="flex items-center gap-2">
+                    <Moon className="size-4" aria-hidden="true" />
+                    Dark
+                  </span>
+                  {theme === 'dark' && (
+                    <span className="text-xs text-primary font-medium">Active</span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm"
+                  onSelect={() => setTheme('system')}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="size-4 flex items-center justify-center text-xs font-bold">⚙</span>
+                    System
+                  </span>
+                  {theme === 'system' && (
+                    <span className="text-xs text-primary font-medium">Active</span>
+                  )}
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="my-1.5" />
+
+                <DropdownMenuItem
+                  disabled={logoutMutation.isPending}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    void signOut();
+                  }}
+                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive focus:bg-destructive/10 focus:text-destructive"
+                >
+                  <LogOut className="size-4" aria-hidden="true" />
+                  <span>{logoutMutation.isPending ? 'Signing out…' : 'Sign out'}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
