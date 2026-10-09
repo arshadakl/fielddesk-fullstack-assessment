@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ShieldCheck, UserPlus, Users as UsersIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ShieldCheck, UserPlus, Users as UsersIcon } from 'lucide-react';
 import { useSession } from '@/modules/auth/hooks/use-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,20 +13,23 @@ import type { UserResDto, UserRole } from '@/modules/users/_api/api.types';
 import { InviteUserDialog } from './_components/invite-user-dialog';
 import { UpdateRoleDialog } from './_components/update-role-dialog';
 
+const PAGE_SIZE = 20;
+
 export default function UsersPage() {
   const { session } = useSession();
   const user = session.data;
 
   const [search, setSearch] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState<UserRole | ''>('');
+  const [page, setPage] = React.useState(1);
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<UserResDto | null>(null);
 
   const { data, isLoading } = useUsers({
     search: search || undefined,
     role: roleFilter ? roleFilter : undefined,
-    page: 1,
-    limit: 50,
+    page,
+    limit: PAGE_SIZE,
   });
 
   if (user && user.role !== 'OWNER') {
@@ -60,13 +63,19 @@ export default function UsersPage() {
           <Input
             placeholder="Search by name or email…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
         <div className="w-40">
           <select
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
+            onChange={(e) => {
+              setRoleFilter(e.target.value as UserRole | '');
+              setPage(1);
+            }}
             className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
             <option value="">All Roles</option>
@@ -139,6 +148,46 @@ export default function UsersPage() {
               ))}
             </TableBody>
           </Table>
+        )}
+
+        {/* Pagination Controls */}
+        {data && data.total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-4 py-3 bg-card/50">
+            <p className="text-xs text-muted-foreground">
+              Showing{' '}
+              <span className="font-medium text-foreground">
+                {(page - 1) * PAGE_SIZE + 1}
+              </span>{' '}
+              to{' '}
+              <span className="font-medium text-foreground">
+                {Math.min(page * PAGE_SIZE, data.total)}
+              </span>{' '}
+              of <span className="font-medium text-foreground">{data.total}</span> users
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="size-3.5 mr-1" />
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground px-1">
+                Page {page} of {Math.max(1, Math.ceil(data.total / PAGE_SIZE))}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page * PAGE_SIZE >= data.total}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+                <ChevronRight className="size-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
