@@ -5,9 +5,9 @@ Complete this document as part of the submission.
 ## Candidate
 
 - Name: Arshad
-- GitHub username: arshadakl
+- GitHub username: [arshadakl](https://github.com/arshadakl)
 - Final commit SHA: 
-- Screen-recording link: 
+- Screen-recording link: [Screen Recording Demo](https://drive.google.com/file/d/1cjC2-CjY01PFFQdjLQMBfW9-3jmE9aWg/view?usp=sharing)
 
 ## Local setup
 
