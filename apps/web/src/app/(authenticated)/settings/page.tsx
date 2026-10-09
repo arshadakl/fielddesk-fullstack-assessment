@@ -3,12 +3,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { Building2, Save } from 'lucide-react';
+import { Building2, Database, Save } from 'lucide-react';
 import { useSession } from '@/modules/auth/hooks/use-session';
 import {
   useCurrentOrganisation,
   useUpdateOrganisation,
 } from '@/modules/organisation/_hooks/use-organisation';
+import { useStorageUsage } from '@/modules/work-orders/_hooks/use-work-orders';
 import {
   updateOrganisationSchema,
   type UpdateOrganisationFormValues,
@@ -17,10 +18,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
 export default function SettingsPage() {
   const { session } = useSession();
   const user = session.data;
   const orgQuery = useCurrentOrganisation();
+  const storageQuery = useStorageUsage();
   const updateMutation = useUpdateOrganisation();
 
   const isOwner = user?.role === 'OWNER';
@@ -112,6 +122,61 @@ export default function SettingsPage() {
               </div>
             )}
           </form>
+        )}
+      </div>
+
+      {/* Storage Quota & Capacity */}
+      <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Database className="size-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold">Storage & Quotas</h2>
+            <p className="text-sm text-muted-foreground">
+              Monitor cloud attachment consumption and remaining capacity for your organisation.
+            </p>
+          </div>
+        </div>
+
+        {storageQuery.isLoading ? (
+          <div className="mt-6 space-y-3 max-w-md">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        ) : storageQuery.data ? (
+          <div className="mt-6 max-w-md space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-foreground">
+                {storageQuery.data.percentageUsed}% Used
+              </span>
+              <span className="text-muted-foreground">
+                {formatBytes(storageQuery.data.usedBytes)} of {formatBytes(storageQuery.data.quotaBytes)}
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  storageQuery.data.percentageUsed >= 95
+                    ? 'bg-destructive'
+                    : storageQuery.data.percentageUsed >= 85
+                      ? 'bg-amber-500'
+                      : 'bg-primary'
+                }`}
+                style={{
+                  width: `${Math.min(100, Math.max(storageQuery.data.usedBytes > 0 ? 1 : 0, storageQuery.data.percentageUsed))}%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tenant storage capacity applies to work order documents, equipment manuals, and completion photos.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-muted-foreground">
+            Unable to retrieve storage quota details at this time.
+          </p>
         )}
       </div>
     </div>
