@@ -14,6 +14,7 @@ import { WORK_ORDER_EVENT_REPOSITORY } from '../interfaces/work-order-event.inte
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
 import type { WorkOrderRepositoryPort } from '../interfaces/work-order-repository.interface';
 import type { Response } from 'express';
+import { InAppNotificationService } from '../../notification/services/in-app-notification.service';
 import type { WorkOrderSummary } from '../interfaces/work-order.interface';
 import { WorkOrderService } from './work-order.service';
 
@@ -121,6 +122,14 @@ describe('WorkOrderService', () => {
       createEventStream: jest.fn(),
     };
 
+    const mockInAppNotifications = {
+      dispatchNotification: jest.fn().mockResolvedValue([]),
+      listNotifications: jest.fn().mockResolvedValue({ items: [], unreadCount: 0 }),
+      markAsRead: jest.fn().mockResolvedValue(null),
+      markAllAsRead: jest.fn().mockResolvedValue(0),
+      clearAll: jest.fn().mockResolvedValue(0),
+    };
+
     module = await Test.createTestingModule({
       providers: [
         WorkOrderService,
@@ -128,6 +137,7 @@ describe('WorkOrderService', () => {
         { provide: WORK_ORDER_EVENT_REPOSITORY, useValue: eventRepo },
         { provide: UserService, useValue: userService },
         { provide: 'NotificationRepositoryPort', useValue: mockNotificationRepo },
+        { provide: InAppNotificationService, useValue: mockInAppNotifications },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: RealtimeService, useValue: mockRealtime },
       ],

@@ -13,6 +13,7 @@ import { formatCsvRow } from '../../../common/utils/csv-sanitizer';
 import type { TenantContext } from '../../../common/interfaces/tenant-context.interface';
 import { PrismaService } from '../../../database/prisma.service';
 import type { NotificationRepositoryPort } from '../../notification/interfaces/notification.interface';
+import { InAppNotificationService } from '../../notification/services/in-app-notification.service';
 import { UserService } from '../../user/services/user.service';
 import { RealtimeService } from '../../realtime/services/realtime.service';
 import { WORK_ORDER_REPOSITORY } from '../interfaces/work-order-repository.interface';
@@ -53,6 +54,7 @@ export class WorkOrderService {
       Pick<WorkOrderEventRepository, 'recordEventWithWorkOrderLock'>,
     @Inject('NotificationRepositoryPort')
     private readonly notificationRepository: NotificationRepositoryPort,
+    private readonly inAppNotifications: InAppNotificationService,
     private readonly prisma: PrismaService,
     private readonly users: UserService,
     private readonly realtime: RealtimeService,
@@ -224,6 +226,15 @@ export class WorkOrderService {
       data: created,
     });
 
+    void this.inAppNotifications.dispatchNotification({
+      organisationId: context.organisationId,
+      actorId: creatorId,
+      type: 'WORK_ORDER_CREATED',
+      workOrderId: created.id,
+      reference: created.reference,
+      assignedTechnicianId: created.assignedTechnicianId,
+    });
+
     return created;
   }
 
@@ -275,6 +286,7 @@ export class WorkOrderService {
     context: TenantContext,
     workOrderId: string,
     input: AssignWorkOrderInput,
+    actorId?: string,
   ): Promise<WorkOrderSummary> {
     const existing = await this.repository.findById(
       context.organisationId,
@@ -370,6 +382,18 @@ export class WorkOrderService {
       assignedTechnicianId: updated.assignedTechnicianId,
       data: updated,
     });
+
+    if (actorId) {
+      void this.inAppNotifications.dispatchNotification({
+        organisationId: context.organisationId,
+        actorId,
+        type: 'WORK_ORDER_ASSIGNED',
+        workOrderId: updated.id,
+        reference: updated.reference,
+        assignedTechnicianId: updated.assignedTechnicianId,
+        previousTechnicianId,
+      });
+    }
 
     return updated;
   }
@@ -586,6 +610,16 @@ export class WorkOrderService {
         reference: workOrderScope.reference,
         assignedTechnicianId: workOrderScope.assignedTechnicianId,
         data: recorded,
+      });
+
+      void this.inAppNotifications.dispatchNotification({
+        organisationId: context.organisationId,
+        actorId: userId,
+        type: 'PROGRESS_EVENT_ADDED',
+        workOrderId,
+        reference: workOrderScope.reference,
+        assignedTechnicianId: workOrderScope.assignedTechnicianId,
+        note: input.payload?.note,
       });
 
       return recorded;
