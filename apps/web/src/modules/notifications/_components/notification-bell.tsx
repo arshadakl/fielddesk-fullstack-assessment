@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Bell, CheckCheck, Trash2, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,16 @@ export function NotificationBell() {
     clearAll,
   } = useNotifications();
 
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    // When the user opens the notification dropdown, automatically mark all unread notifications as read
+    if (open && unreadCount > 0) {
+      markAllAsRead();
+    }
+  };
+
   const handleNotificationClick = (workOrderId?: string, id?: string) => {
     if (id) {
       markAsRead(id);
@@ -32,7 +43,7 @@ export function NotificationBell() {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"

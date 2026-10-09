@@ -28,21 +28,78 @@ export function useNotifications(limit = 25) {
 
   const markAsReadMutation = useMutation({
     mutationFn: (id: string) => markNotificationAsRead(id),
-    onSuccess: () => {
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<InAppNotificationListResDto>(queryKey);
+
+      if (previous) {
+        const wasUnread = previous.items.some((item) => item.id === id && !item.isRead);
+        queryClient.setQueryData<InAppNotificationListResDto>(queryKey, {
+          ...previous,
+          unreadCount: wasUnread ? Math.max(0, previous.unreadCount - 1) : previous.unreadCount,
+          items: previous.items.map((item) =>
+            item.id === id ? { ...item, isRead: true } : item,
+          ),
+        });
+      }
+
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: notificationsKeys.all });
     },
   });
 
   const markAllAsReadMutation = useMutation({
     mutationFn: () => markAllNotificationsAsRead(),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<InAppNotificationListResDto>(queryKey);
+
+      if (previous) {
+        queryClient.setQueryData<InAppNotificationListResDto>(queryKey, {
+          ...previous,
+          unreadCount: 0,
+          items: previous.items.map((item) => ({ ...item, isRead: true })),
+        });
+      }
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: notificationsKeys.all });
     },
   });
 
   const clearAllMutation = useMutation({
     mutationFn: () => clearAllNotifications(),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<InAppNotificationListResDto>(queryKey);
+
+      queryClient.setQueryData<InAppNotificationListResDto>(queryKey, {
+        items: [],
+        unreadCount: 0,
+      });
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: notificationsKeys.all });
     },
   });
